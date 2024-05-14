@@ -6,7 +6,13 @@ if [ -z "$engine" ]; then
    echo Missing engine name, valid engines are pico and vosk
    exit
 elif [ -z "$param" ]; then
-   echo Missing engine parameter
+   if [ $engine = pico ]; then
+       echo Missing PicoVoice access key
+   elif [ $engine = vosk ]; then
+       echo Missing Vosk speech model folder
+   else
+       echo Unknown engine $engine, valid engines are pico and vosk
+   fi
    exit
 elif [ $engine = pico ]; then
    pname=picoAccessKey
