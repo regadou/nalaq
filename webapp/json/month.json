@@ -1,0 +1,17 @@
+[
+{"id":1,"fr":"janvier","en":"january","jours":31},
+{"id":2,"fr":"février","en":"february","jours":28}
+,
+{"id":3,"fr":"mars","en":"march","jours":31},
+{"id":4,"fr":"avril","en":"april","jours":30},
+{"id":5,"fr":"mai","en":"may","jours":31},
+{"id":6,"fr":"juin","en":"june","jours":30},
+{"id":7,"fr":"juillet","en":"july","jours":31},
+{"id":8,"fr":"août","en":"august","jours":31}
+,
+{"id":9,"fr":"septembre","en":"september","jours":30},
+{"id":10,"fr":"octobre","en":"october","jours":31},
+{"id":11,"fr":"novembre","en":"november","jours":30},
+{"id":12,"fr":"décembre","en":"december","jours":31}
+
+]

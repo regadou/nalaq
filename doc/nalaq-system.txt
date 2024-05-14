@@ -1,0 +1,85 @@
+- the goals behind the NaLaQ project:
+  - be the last software to be programmed by programming language coding
+  - a software that can do everything that current wide-spread existing technology is capable
+  - communicate verbally with the computer to tell it what we want
+  - easily automate computer tasks without needing a computer expert to intervene
+  - free the people from greedy and prying technology vendors
+- the NaLaQ system tries to use well known data standards to achieve universal semantics:
+  - the main standards are URI, HTTP, HTML, JSON and SQL
+  - secondary standards like CSV, YAML, RDF, image, audio and video file formats are mapped to one of the 5 main standards
+  - the same applies for file, ftp, data, mailto, geo and jdbc uri schemes
+  - the system also uses the non-standard nalaq URI scheme and text/x-nalaq file format to embed NaLaQ code into a URI or in a file
+  - the system will also use NaLaQ and ETS as uri scheme or file format to access all the universal semantics created by the system
+- the type system in type.kt file:
+  - the Type interface manages all data types, properties and instances
+    - possible schema sources include JVM classes, SQL tables, RDF types, JSON schema and data files
+    - automated schema extraction by scanning data in Collection<Map> format from the following data types:
+      - CSV, JSON, YAML and HTML tables
+  - The Property class manages type properties
+  - the PropertyValue class manages reference to an instance property value (equivalent to RDF Statement class)
+  - the 8 data levels are defined in the createRootTypes function
+  - builtin subtypes are defined in the createSubTypes function
+  - custom types created programmatically, by importing schema source or scanning Collection<Map|String|Property|Map.Entry> data structures
+    - if collection items type is string, each string must be a valid SQL column definition
+    - if collection items type is map, all items must must have the same keys and the same value type (or null) for each key
+  - public management functions:
+        fun getTypeByClass(klass: KClass<*>): Type
+        fun getTypeByName(name: String): Type?
+        fun getTypeFromData(data: Collection<*>, name: String? = null): Type?
+- the URI system implemented in uri.kt file:
+  - schemes: http,https,file,data,geo,nalaq,jdbc,sftp,mailto,sip
+  - methods implemented as extension functions: get, post, put, delete
+  - custom uri schemes can be created with namespace management
+- mimetype management in format.kt file:
+  - automated encoding and decoding of supported mimetypes with class Format
+  - direct InputStream reading and OutputStream writing for Table could also be named Entity or TypeDefinition or Definition or Schema and have a generic map/entity schema usagemore efficiency
+  - Format class has utility functions decodeText and encodeText to use strings instead of streams
+  - public management functions:
+        fun getFormat(txt: String): Format?
+        fun getExtensionMimetype(txt: String): String?
+        fun getMimetypeExtensions(txt: String): List<String>
+  - builtin support for all image formats supported by the JVM
+  - other builtin formats defined in the function initManagedMimetypes:
+        application/octet-stream text/plain text/x-java-properties text/csv
+        text/uri-list text/x-nalaq application/json application/yaml text/html
+        application/xml application/x-www-form-urlencoded
+- namespace management system in namespace.kt file:
+  - can be used as a word dictionary for natural languages, script constants/variables and RDF namespaces
+  - the registered prefix allows words in the namespace to be used as uris in the NaLaQ system
+  - public management functions:
+        fun getNamespace(prefix: String): Namespace? 
+        fun addNamespace(ns: Namespace): Boolean
+- databases management in database.kt file:
+  - create an instance with a jdbc uri loaded with java.net.URI("jdbc:<vendor>://...").get()
+  - user and password can be supplied in the uri user info part 
+  - supported vendors: h2, mysql, postgresql, sqlite, derby, mssql, msaccess, oracle, mongodb
+  - can be used as a namespace where keys can be table names, column names and specified instance string values
+- data conversion system in converters.kt file:
+  - generic conversion function: fun <T: Any> convert(value: Any?, type: KClass<T>): T
+  - specific class conversion functions:
+        toString toCharSequence toByteArray toChar
+        toByte toShort toInt toLong toFloat toDouble toNumber toBoolean
+        toMap toList toSet toCollection toArray
+        toView toDateTime toDate toTime
+        toFunction toClass toType toProperty
+        toNamespace toURI toExpression
+- special media types classes in view.kt file:
+  - View interface with source URI and ETS value
+  - View implementations: Chemical, GeoLocation, Document, Image, Audio, Video, Model
+  - public generic function: fun createView(uri: URI): View
+- language functions in function.kt:
+  - builtin natural language concepts: and as do done each equal from get in is less more not of or to while with
+  - KFunction extension for user function creation: class NaLaQFunction(...): KFunction<Any?>
+  - function extension for text parsing purposes: KFunction<*>.precedence(function: KFunction<*>): Int
+- text parser implemented in parser.kt file:
+  - converts text to expression that can be evaluated to execute underlying kotlin functions or java methods
+  - recognizes following token types: defined names, numbers, date and time, uris, JVM qualified objects and quoted strings
+  - names are defined with configured namespaces
+  - default namespace defines builtin functions, registered types and keywords (all, true, false, null)
+  - contextual variables for user thread or custom function internal is managed by the ThreadLocal Context class
+    - uses getContext and findContext public functions for context management
+- HTTP server implemented with ktor in server.kt file:
+  - dynamic routing configured by the Configuration class passed in command line arguments
+  - server port, namespaces, static files folder and apis endpoints can be configured
+  - if an api endpoint resolves to a function, a POST or PUT query can execute it with the request body as parameters of the function
+  

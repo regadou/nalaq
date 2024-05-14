@@ -1,0 +1,13 @@
+[
+{"id":1,"fr":"milliseconde","en":"millisecond","factor":0.001},
+{"id":2,"fr":"seconde","en":"second","factor":1},
+{"id":3,"fr":"minute","en":"minute","factor":60},
+{"id":4,"fr":"heure","en":"hour","factor":3600},
+{"id":5,"fr":"jour","en":"day","factor":86400},
+{"id":6,"fr":"semaine","en":"week","factor":604800},
+{"id":7,"fr":"mois","en":"month","factor":18144000},
+{"id":8,"fr":"année","en":"year","factor":6626960000}
+,
+{"id":9,"fr":"siècle","en":"century","factor":662696000000}
+
+]

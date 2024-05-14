@@ -1,0 +1,10 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix grddl: <http://www.w3.org/2003/g/data-view#> .
+
+grddl: a owl:Ontology ;
+	dc:title "GRDDL Data Views" ;
+	dc:description "GRDDL is a technique for gleaning resource descriptions from dialects of languages. It's a way of extracting Semantic Web data in RDF from XML formats (especially XHTML dialects or microformats) via transformations identified by URIs and typically expressed in XSLT." .
+
+grddl:namespaceTransformation a rdfs:Property .
+

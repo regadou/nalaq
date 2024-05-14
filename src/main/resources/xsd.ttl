@@ -1,0 +1,97 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+xsd:anyURI a rdfs:Datatype ;
+   rdfs:label "uri"@fr ;
+   rdfs:label "uri"@en .
+
+xsd:string a rdfs:Datatype ;
+   rdfs:label "texte"@fr ;
+   rdfs:label "text"@en .
+
+xsd:boolean a rdfs:Datatype ;
+   rdfs:label "bool\u00e9en"@fr ;
+   rdfs:label "boolean"@en .
+
+xsd:dateTime a rdfs:Datatype ;
+   rdfs:label "date et heure"@fr ;
+   rdfs:label "date and time"@en .
+
+xsd:date a rdfs:Datatype ;
+   rdfs:label "date"@fr ;
+   rdfs:label "date"@en .
+
+xsd:time a rdfs:Datatype ;
+   rdfs:label "heure"@fr ;
+   rdfs:label "time"@en .
+
+xsd:duration a rdfs:Datatype ;
+   rdfs:label "dur\u00e9e"@fr ;
+   rdfs:label "duration"@en .
+
+xsd:double a rdfs:Datatype ;
+   rdfs:label "r\u00e9el double"@fr ;
+   rdfs:label "double real"@en .
+
+xsd:float a rdfs:Datatype ;
+   rdfs:label "r\u00e9el"@fr ;
+   rdfs:label "real"@en .
+
+xsd:decimal a rdfs:Datatype ;
+   rdfs:label "nombre d\u00e9cimal"@fr ;
+   rdfs:label "decimal"@en .
+
+xsd:positiveInteger a rdfs:Datatype ;
+   rdfs:label "entier positif"@fr ;
+   rdfs:label "positive integer"@en .
+
+xsd:integer a rdfs:Datatype ;
+   rdfs:label "entier"@fr ;
+   rdfs:label "integer"@en .
+
+xsd:nonPositiveInteger a rdfs:Datatype ;
+   rdfs:label "entier non positif"@fr ;
+   rdfs:label "non positive integer"@en .
+
+xsd:negativeInteger a rdfs:Datatype ;
+   rdfs:label "entier n\u00e9gatif"@fr ;
+   rdfs:label "negative integer"@en .
+
+xsd:long a rdfs:Datatype ;
+   rdfs:label "entier long"@fr ;
+   rdfs:label "long integer"@en .
+
+xsd:int a rdfs:Datatype ;
+   rdfs:label "entier"@fr ;
+   rdfs:label "integer"@en .
+
+xsd:short a rdfs:Datatype ;
+   rdfs:label "entier court"@fr ;
+   rdfs:label "short integer"@en .
+
+xsd:byte a rdfs:Datatype ;
+   rdfs:label "octet"@fr ;
+   rdfs:label "byte"@en .
+
+xsd:nonNegativeInteger a rdfs:Datatype ;
+   rdfs:label "entier non n\u00e9gatif"@fr ;
+   rdfs:label "non negative integer"@en .
+
+xsd:unsignedLong a rdfs:Datatype ;
+   rdfs:label "entier long non sign\u00e9"@fr ;
+   rdfs:label "unsigned long integer"@en .
+
+xsd:unsignedInt a rdfs:Datatype ;
+   rdfs:label "entier non sign\u00e9"@fr ;
+   rdfs:label "unsigned integer"@en .
+
+xsd:unsignedShort a rdfs:Datatype ;
+   rdfs:label "entier court non sign\u00e9"@fr ;
+   rdfs:label "unsigned short integer"@en .
+
+xsd:unsignedByte a rdfs:Datatype ;
+   rdfs:label "octet non sign\u00e9"@fr ;
+   rdfs:label "unsigned byte"@en .
+
+

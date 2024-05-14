@@ -1,0 +1,37 @@
+<html>
+<head>
+    <title>Chat with NaLaQ</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="style.css"/>
+    <script src="chat.js"></script>
+</head>
+<body theme="magicreg" onload="init()">
+    <h1 style="text-align:center;font-size:20px">Chat with NaLaQ</h1>
+    <div id=main></div>
+    <template id=layout>
+        <table style="margin:0;width:{width}px;height:{height}px">
+        <tr>
+            <td colspan=1 rowspan=1 style="padding:5px;vertical-align:top;width:50%">
+                <div id=chatlog style="overflow:overlay;max-height:{maxhl}px"></div>
+            </td>
+            <td colspan=1 rowspan=2 style="padding:5px;vertical-align:top">
+                <div id=content style="overflow:overlay;max-height:{maxhr}px"></div>
+            </td>
+        </tr>
+        <tr>
+            <td colspan=1 rowspan=1 style="padding:5px;vertical-align:middle;height:{hbottom}px">
+                <textarea id=message style="width:{wtextarea}px;height:{htextarea}px"></textarea><br>
+                <input type=button value="Send message" onclick="sendText('message','chatlog','chatline')" style="height:{hbutton}px">
+                <select id="audio" onchange="setAudioDevice(this)" style="height:{hbutton}px">
+                    <option value="">Audio listening off</option>
+                </select>
+            </td>
+        </tr>
+        </table>
+    </template>
+    <template id=chatline>
+        <div style="vertical-align:middle"><span style="font-weight:bold;font-size:20px">{prompt}&nbsp;</span>{text}</div>
+    </template>
+</body>
+</html>
+

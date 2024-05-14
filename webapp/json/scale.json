@@ -1,0 +1,20 @@
+[
+{"id":4,"name":"","lot":"great","few":"","most":"","least":"","more":"","less":"","entity":"","attribute":null},
+{"id":11,"name":"freedom","lot":"free","few":"trapped","most":"","least":"","more":"","less":"","entity":"","attribute":null},
+{"id":12,"name":"goodness","lot":"good","few":"bad","most":"best","least":"worst","more":"better","less":"worst","entity":"","attribute":null},
+{"id":14,"name":"opening","lot":"open","few":"close","most":"","least":"","more":"","less":"","entity":"","attribute":null},
+{"id":5,"name":"mass","lot":"heavy","few":"light","most":"heaviest","least":"lightest","more":"heavier","less":"lighter","entity":"ETT/SS","attribute":"quantity"},
+{"id":6,"name":"length","lot":"long","few":"short","most":"longest","least":"shortest","more":"longer","less":"shorter","entity":"S","attribute":"quantity"},
+{"id":7,"name":"time","lot":"after","few":"before","most":"","least":"","more":"","less":"","entity":"T","attribute":"direction"},
+{"id":8,"name":"period","lot":"end","few":"beginning","most":"","least":"","more":"","less":"","entity":"T","attribute":"position"},
+{"id":9,"name":"age","lot":"old, used","few":"new, young","most":"oldest","least":"youngest","more":"older","less":"younger","entity":"T","attribute":"quantity"},
+{"id":10,"name":"activation","lot":"on","few":"off","most":"","least":"","more":"","less":"","entity":"E","attribute":"position"},
+{"id":16,"name":"strength, force","lot":"strong","few":"weak","most":"strongest","least":"weakest","more":"stronger","less":"weaker","entity":"E/S","attribute":"quantity"},
+{"id":1,"name":"vertical","lot":"up","few":"down","most":"","least":"","more":"","less":"under","entity":"S","attribute":"position"},
+{"id":3,"name":"horizontal","lot":"front","few":"back","most":"","least":"","more":"","less":"","entity":"S","attribute":"position"},
+{"id":2,"name":"size, volume","lot":"big","few":"small","most":"biggest","least":"smallest","more":"bigger","less":"smaller","entity":"S or SSS for volume","attribute":"quantity"},
+{"id":17,"name":"color","lot":"bright","few":"dark","most":"brightest, white","least":"darkest, black","more":"brighter","less":"darker","entity":"","attribute":""},
+{"id":13,"name":"horizontal side","lot":"right","few":"left","most":"","least":"","more":"","less":"","entity":"S","attribute":"position"},
+{"id":18,"name":"speed","lot":"fast","few":"slow","most":"fastest","least":"slowest","more":"faster","less":"slower","entity":"S/T","attribute":"quantity"},
+{"id":15,"name":"effort","lot":"hard","few":"easy","most":"hardest","least":"easiest","more":"harder","less":"easiest","entity":"E","attribute":"quantity"}
+]
