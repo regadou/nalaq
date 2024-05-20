@@ -26,24 +26,6 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.toKotlinDuration
 
-fun <T: Any> convert(value: Any?, type: KClass<T>): T {
-    if (type.isInstance(value))
-        return value as T
-    if (value.isReference())
-        return convert(value.resolve(), type)
-    val converter = converters[type]
-    if (converter != null)
-        return converter.call(value) as T
-    if (Date::class.isSuperclassOf(type))
-        return toUtilDate(value) as T
-    val srcClass = if (value == null) Void::class else value::class
-    throw RuntimeException("Cannot convert ${srcClass.qualifiedName} to ${type.qualifiedName}")
-}
-
-fun getConverter(type: KClass<*>): KFunction<Any?>? {
-    return converters[type]
-}
-
 /*************************************
  The difference between all the converters below and their counterparts in extensions.kt file is of the following:
  - converters should never fail and tries the conversion process, possibly returning inadequate data, but of the proper requested type
@@ -52,6 +34,10 @@ fun getConverter(type: KClass<*>): KFunction<Any?>? {
  - you should always check for nullity after an extension conversion function call
  - an extension conversion function toX() should have a companion boolean function isX() to validate if conversion is possible
 ****************************************/
+
+fun getConverter(type: KClass<*>): KFunction<Any?>? {
+    return converters[type]
+}
 
 fun toByteArray(value: Any?): ByteArray {
     if (value is ByteArray)

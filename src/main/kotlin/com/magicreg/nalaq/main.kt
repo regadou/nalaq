@@ -1,6 +1,7 @@
 package com.magicreg.nalaq
 
 const val envConfigName = "NALAQ_CONFIG"
+
 fun main(args: Array<String>) {
     val config = loadConfiguration(args)
     if (config != null)

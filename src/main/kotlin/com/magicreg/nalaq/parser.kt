@@ -3,7 +3,6 @@ package com.magicreg.nalaq
 import java.net.URI
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
-import kotlin.reflect.KParameter
 
 fun compileTokens(vararg tokens: Any?): Expression {
     if (tokens.isEmpty())
@@ -13,12 +12,6 @@ fun compileTokens(vararg tokens: Any?): Expression {
             return compileTokens(LineStatus(tokens.toList()), true)
     }
     return compileExpressions(ParserStatus(tokens.toList() as List<List<Any?>>), true)
-}
-
-enum class TextParser {NALAQ, NLP, TRANSLATE}
-
-interface Parser {
-    fun parse(txt: String): Expression
 }
 
 class NaLaQParser(): Parser {

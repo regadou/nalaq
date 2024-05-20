@@ -30,8 +30,6 @@ fun stopSpeechInput(uri: URI?): Boolean {
     return true
 }
 
-enum class SpeechEngine {VOSK, PICO}
-
 class SpeechReader(val audioStream: AudioInputStream): Reader() {
     val configuration = getContext().configuration
     private val buffer = StringBuilder()
@@ -74,13 +72,6 @@ class SpeechReader(val audioStream: AudioInputStream): Reader() {
     fun write(txt: String) {
         buffer.append(txt)
     }
-}
-
-interface SpeechProcessor: Runnable {
-    fun isRunning(): Boolean
-    fun wasStopped(): Boolean
-    fun stopRunning()
-    fun start()
 }
 
 class VoskSpeechProcessor(private val reader: SpeechReader): SpeechProcessor {

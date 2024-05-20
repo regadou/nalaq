@@ -2,73 +2,9 @@ package com.magicreg.nalaq
 
 import java.lang.reflect.Field
 import java.net.URI
-import java.util.*
-import kotlin.reflect.KClass
-import kotlin.reflect.KFunction
 import kotlin.reflect.KProperty
 import kotlin.reflect.jvm.javaField
 import kotlin.reflect.jvm.javaGetter
-
-class Expression(
-    val function: KFunction<Any?>? = null,
-    val parameters: List<Any?> = emptyList()
-) {
-    fun value(): Any? {
-        return if (function == null)
-            parameters.simplify(true)
-        else if (parameters.isEmpty())
-            function
-        else
-            function.call(*getFunctionParameters())
-    }
-
-    override fun toString(): String {
-        val name = function?.name ?: ""
-        val space = if (function == null) "" else " "
-        return "("+name+space+parameters.joinToString(" ")+")"
-    }
-
-    private fun getFunctionParameters(): Array<Any?> {
-        val funcParams = function!!.parameters
-        if (funcParams.isEmpty())
-            return emptyArray()
-
-        if (funcParams.size == 1) {
-            val param = funcParams[0]
-            val type = param.type.classifier!! as KClass<*>
-            if (param.isVararg)
-                return parameters.map{convert(it,type)}.toTypedArray()
-            if (type.isInstance(parameters))
-                return arrayOf(parameters)
-            val value = if (parameters.isEmpty()) null else parameters[0]
-            return arrayOf(convert(value, type))
-        }
-
-        val targetParams = mutableListOf<Any?>()
-        for ((index,param) in funcParams.withIndex()) {
-            val value = if (index >= parameters.size) null else parameters[index]
-            targetParams.add(convert(value, param.type.classifier!! as KClass<*>))
-        }
-        val lastParam = funcParams[funcParams.size-1]
-        if (lastParam.isVararg) {
-            val type = lastParam.type.classifier!! as KClass<*>
-            var left = parameters.size - funcParams.size
-            while (left > 0) {
-                targetParams.add(convert(parameters[parameters.size-left], type))
-                left--
-            }
-        }
-
-        return targetParams.toTypedArray()
-    }
-}
-
-interface Reference: MutableMap.MutableEntry<String,Any?> {
-    override val key: String
-    override val value: Any?
-    val parent: Any?
-    val readOnly: Boolean
-}
 
 class PropertyReference(
     override val key: String,

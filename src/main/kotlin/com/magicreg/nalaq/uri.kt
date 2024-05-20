@@ -13,87 +13,7 @@ fun isBuiltinUriScheme(scheme: String): Boolean {
     return URI_SCHEMES.contains(scheme)
 }
 
-fun URI.readOnly(): Boolean {
-    val uri = resolveRelativeTemplate(this)
-    if (uri.scheme == "data" && uri.toString().indexOf(",") < 0)
-        return false
-    return getNamespace(uri.scheme)?.readOnly ?: READONLY_URI_SCHEMES.contains(uri.scheme)
-}
-
-fun URI.contentType(): String? {
-    return when (this.scheme) {
-        "data" -> this.toString().split(",")[0].split(";")[0].split(":")[1]
-        "file" -> if (getContext().realFile(this.path).isDirectory) "inode/directory" else this.path.fileType()
-        "ftp", "sftp", "ftps" -> this.path.fileType()
-        "http", "https" -> {
-            val type = this.toURL().openConnection().contentType
-            if (type == null) null else type.split(";")[0].trim()
-        }
-        else -> null
-    }
-}
-
-fun URI.get(headers: Map<String,String> = mapOf()): Any? {
-    val uri = resolveRelativeTemplate(this)
-    return when(uri.scheme) {
-        "http", "https" -> httpRequest("get", uri, headers)
-        "file" -> getFile(uri.path)
-        "data" -> decodeData(uri.toString())
-        "jdbc" -> try { Database(uri.toString()) } catch (e: Exception) { e }
-        "nalaq" -> getNaLaQValue(uri.toString(), uri.query, uri.fragment)
-        "geo"-> GeoLocation(uri)
-        "sftp" -> RuntimeException("Uri scheme not implemented yet for GET: ${uri.scheme}")
-        // TODO: mailto and sip could do contact search, check mailbox, voicemail, messages, log history, ...
-        else -> {
-            val ns = getNamespace(uri.scheme)
-            if (ns != null) ns.value(uri.toString()) else RuntimeException("Unsupported uri scheme for GET: ${uri.scheme}")
-        }
-    }
-}
-
-fun URI.post(value: Any?, headers: Map<String,String> = mapOf()): Any? {
-    val uri = resolveRelativeTemplate(this)
-    return when(uri.scheme) {
-        "http", "https" -> httpRequest("post", uri, headers,  value)
-        "file" -> postFile(uri.path, value, headers)
-        "data" -> encodeData(uri.toString(), value)
-        "sftp", "mailto", "sip" -> throw RuntimeException("Uri scheme not implemented yet for POST: ${uri.scheme}")
-        else -> getNamespace(uri.scheme)?.setValue(uri.toString(), value)
-                ?: RuntimeException("Unsupported uri scheme for POST: ${uri.scheme}")
-    }
-}
-
-fun URI.put(value: Any?, headers: Map<String,String> = mapOf()): Any? {
-    val uri = resolveRelativeTemplate(this)
-    return when(uri.scheme) {
-        "http", "https" -> httpRequest("put", uri, headers,  value)
-        "file" -> putFile(uri.path, value, headers)
-        "data" -> encodeData(uri.toString(), value)
-        "sftp", "mailto", "sip" -> throw RuntimeException("Uri scheme not implemented yet for PUT: ${uri.scheme}")
-        else -> getNamespace(uri.scheme)?.setValue(uri.toString(), value)
-                ?: RuntimeException("Unsupported uri scheme for PUT: ${uri.scheme}")
-    }
-}
-
-fun URI.delete(headers: Map<String,String> = mapOf()): Any? {
-    val uri = resolveRelativeTemplate(this)
-    return when(uri.scheme) {
-        "http", "https" -> httpRequest("delete", uri, headers)
-        "file" -> deleteFile(uri.path)
-        "sftp" -> RuntimeException("Uri scheme not implemented yet for DELETE: ${uri.scheme}")
-        else -> getNamespace(uri.scheme)?.setValue(uri.toString(), null)
-                ?: RuntimeException("Unsupported uri scheme for DELETE: ${uri.scheme}")
-    }
-}
-
-private const val TEXT_FORMAT = "text/plain"
-private const val DATA_FORMAT = "application/json"
-private const val CONTENT_TYPE_HEADER = "content-type"
-private val URI_SCHEMES = "http,https,file,data,geo,nalaq,jdbc,sftp,mailto,sip".split(",")
-private val READONLY_URI_SCHEMES = "data,geo,nalaq".split(",")
-private val DATA_SERIALIZER = DataUrlSerializer()
-
-private fun resolveRelativeTemplate(uri: URI): URI {
+fun resolveRelativeTemplate(uri: URI): URI {
     // TODO: find out template sections and resolve variables
     if (uri.scheme != null)
         return uri
@@ -108,6 +28,63 @@ private fun resolveRelativeTemplate(uri: URI): URI {
     val fullPath = File(cx.parentFolder(), path)
     return URI("${cx.uri}$fullPath")
 }
+
+fun resolveUri(uri: URI, method: UriMethod, headers: Map<String,String>, body: Any?): Any? {
+    val url = resolveRelativeTemplate(uri)
+    return when (method) {
+        UriMethod.GET -> when (url.scheme) {
+            "http", "https" -> httpRequest("get", url, headers)
+            "file" -> getFile(url.path)
+            "data" -> decodeData(url.toString())
+            "jdbc" -> try {
+                Database(url.toString())
+            } catch (e: Exception) {
+                e
+            }
+
+            "nalaq" -> getNaLaQValue(url.toString(), url.query, url.fragment)
+            "geo" -> GeoLocation(url)
+            "sftp" -> RuntimeException("Uri scheme not implemented yet for GET: ${url.scheme}")
+            // TODO: mailto and sip could do contact search, check mailbox, voicemail, messages, log history, ...
+            else -> {
+                val ns = getNamespace(url.scheme)
+                if (ns != null) ns.value(url.toString()) else RuntimeException("Unsupported uri scheme for GET: ${url.scheme}")
+            }
+        }
+
+        UriMethod.POST -> when (url.scheme) {
+            "http", "https" -> httpRequest("post", url, headers, body)
+            "file" -> postFile(url.path, body, headers)
+            "data" -> encodeData(url.toString(), body)
+            "sftp", "mailto", "sip" -> throw RuntimeException("Uri scheme not implemented yet for POST: ${url.scheme}")
+            else -> getNamespace(url.scheme)?.setValue(url.toString(), body)
+                ?: RuntimeException("Unsupported uri scheme for POST: ${url.scheme}")
+        }
+
+        UriMethod.PUT -> when (url.scheme) {
+            "http", "https" -> httpRequest("put", url, headers, body)
+            "file" -> putFile(url.path, body, headers)
+            "data" -> encodeData(url.toString(), body)
+            "sftp", "mailto", "sip" -> throw RuntimeException("Uri scheme not implemented yet for PUT: ${url.scheme}")
+            else -> getNamespace(url.scheme)?.setValue(url.toString(), body)
+                ?: RuntimeException("Unsupported uri scheme for PUT: ${url.scheme}")
+        }
+
+        UriMethod.DELETE -> when (url.scheme) {
+            "http", "https" -> httpRequest("delete", url, headers)
+            "file" -> deleteFile(url.path)
+            "sftp" -> RuntimeException("Uri scheme not implemented yet for DELETE: ${url.scheme}")
+            else -> getNamespace(url.scheme)?.setValue(url.toString(), null)
+                ?: RuntimeException("Unsupported uri scheme for DELETE: ${url.scheme}")
+        }
+    }
+}
+
+private const val TEXT_FORMAT = "text/plain"
+private const val DATA_FORMAT = "application/json"
+private const val CONTENT_TYPE_HEADER = "content-type"
+private val URI_SCHEMES = "http,https,file,data,geo,nalaq,jdbc,sftp,mailto,sip".split(",")
+private val DATA_SERIALIZER = DataUrlSerializer()
 
 private fun getNaLaQValue(uri: String, query: String?, fragment: String?): Any? {
     val txt = URLDecoder.decode(uri.substring(uri.indexOf(":")+1).split("#")[0].split("?")[0], defaultCharset())
@@ -153,7 +130,7 @@ private fun getFile(filename: String?): Any? {
     return if (file.isDirectory)
         file.listFiles().map { it.toURI() }
     else if (file.exists())
-        decode(file.toString().fileType(), FileInputStream(file))
+        decode(detectFileType(file.toString()), FileInputStream(file))
     else
         null
 }
@@ -162,7 +139,7 @@ private fun putFile(filename: String?, value: Any?, headers: Map<String,String>)
     val cx = getContext()
     val file = cx.realFile(filename ?: "")
     if (canSaveFile(file)) {
-        val type = headers["content-type"] ?: file.toString().fileType()
+        val type = headers["content-type"] ?: detectFileType(file.toString())
         encode(value, type, FileOutputStream(file))
         return cx.fileUri(File(filename))
     }
@@ -177,7 +154,7 @@ private fun postFile(filename: String?, value: Any?, headers: Map<String,String>
         val type = headers["content-type"] ?: if (value is CharSequence || value is Number || value is Boolean) TEXT_FORMAT else DATA_FORMAT
         val name = Math.random().toString().split(".")[1] + "." + getMimetypeExtensions(type)[0]
         val newFile = File("$file/$name")
-        encode(value, file.toString().fileType(), FileOutputStream(newFile))
+        encode(value, detectFileType(file.toString()), FileOutputStream(newFile))
         return cx.fileUri(newFile)
     }
     return putFile(filename, value, headers)

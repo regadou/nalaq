@@ -9,16 +9,16 @@ import kotlin.reflect.KFunction
 
 fun runConfiguration(config: Configuration) {
     getContext(config)
-    setOutputFormat(config.outputFormat)
+    setOutputFormat(config.outputFormat ?: "application/json")
     if (config.printConfig)
-        println("configuration = "+getFormat(config.outputFormat)!!.encodeText(config))
+        println("configuration = "+outputFormat!!.encodeText(config))
     if (!config.executeExpression.isNullOrBlank())
         executeExpression(config)
-    when (config.startMethod) {
+    when (val startMethod = config.startMethod ?: "console") {
         "server" -> startServer(config)
         "console" -> startConsole(config)
         "expression", "noop" -> {}
-        else -> throw RuntimeException("Invalid start method: ${config.startMethod}\nValid values are server, console, expression or noop")
+        else -> throw RuntimeException("Invalid start method: $startMethod\nValid values are server, console, expression or noop")
     }
 }
 
@@ -45,7 +45,7 @@ fun loadConfiguration(args: Array<String>): Configuration? {
     val configData = toMap(value)
     var start: String? = null
     var exp: String? = null
-    if (args.size > 2) {
+    if (args.size > offset) {
         start = "expression"
         exp = args.toList().subList(offset, args.size).joinToString(" ")
     }
@@ -55,11 +55,11 @@ fun loadConfiguration(args: Array<String>): Configuration? {
         resultPrompt = if (configData.containsKey("resultPrompt")) configData["resultPrompt"]?.toString() else defaultResultPrompt,
         expressionPrompt = if (configData.containsKey("expressionPrompt")) configData["expressionPrompt"]?.toString() else defaultExpressionPrompt,
         printConfig = toBoolean(configData["printConfig"]),
-        outputFormat = configData["outputFormat"]?.toString() ?: defaultOutputFormat,
+        outputFormat = configData["outputFormat"]?.toString(),
         exitWords = getListValues(configData["exitWords"], defaultExitWords),
         language = configData["language"]?.toString() ?: Locale.getDefault().language,
         targetLanguage = configData["targetLanguage"]?.toString(),
-        translateEndpoint = configData["translateEndpoint"]?.toString(),
+        translateEndpoint = configData["translateEndpoint"]?.toUri(),
         textParser = selectedEnum(TextParser::values, configData["textParser"]) ?: TextParser.entries[0],
         nlpModelFolder = configData["nlpModelFolder"]?.toString(),
         speechEngine = selectedEnum(SpeechEngine::values, configData["speechEngine"]),
@@ -69,7 +69,7 @@ fun loadConfiguration(args: Array<String>): Configuration? {
         webContextName = if (configData.containsKey("webContextName")) configData["webContextName"]?.toString() else defaultWebContextName,
         namespaces = getMapUris(configData["namespaces"], ::loadNamespace),
         staticFolder = configData["staticFolder"]?.toString() ?: defaultStaticFolder,
-        startMethod =  configData["startMethod"]?.toString() ?: start ?: defaultStartMethod,
+        startMethod =  configData["startMethod"]?.toString() ?: start,
         executeExpression = exp ?: configData["executeExpression"]?.toString()
     )
 }
@@ -83,7 +83,7 @@ fun defaultConfiguration(expression: String? = null, debug: Boolean = false): Co
         resultPrompt = if (exp == null || debug) defaultResultPrompt else if (lineCount == 1) "" else null,
         expressionPrompt = if (debug) defaultExpressionPrompt else null,
         printConfig = debug,
-        outputFormat = defaultOutputFormat,
+        outputFormat = null,
         exitWords = defaultExitWords,
         language = Locale.getDefault().language,
         targetLanguage = null,
@@ -97,7 +97,7 @@ fun defaultConfiguration(expression: String? = null, debug: Boolean = false): Co
         webContextName = defaultWebContextName,
         namespaces = emptyMap(),
         staticFolder = defaultStaticFolder,
-        startMethod = if (exp != null) "expression" else if (port > 0) "server" else defaultStartMethod,
+        startMethod = if (exp != null) "expression" else if (port > 0) "server" else null,
         executeExpression = exp
     )
 }
@@ -108,40 +108,15 @@ fun defaultCharset(charset: String? = null): String {
     return defaultCharset
 }
 
-data class Configuration(
-    val consolePrompt: String? = null,
-    val resultPrompt: String? = null,
-    val expressionPrompt: String? = null,
-    val printConfig: Boolean = false,
-    val outputFormat: String = defaultOutputFormat,
-    val exitWords: List<String> = emptyList(),
-    val textParser: TextParser = TextParser.entries[0],
-    val language: String = Locale.getDefault().language,
-    val targetLanguage: String? = null,
-    val translateEndpoint: String? = null,
-    val nlpModelFolder: String? = null,
-    val speechEngine: SpeechEngine? = null,
-    val voskSpeechModel: URI? = null,
-    val picoAccessKey: String? = null,
-    val serverPort: Int? = null,
-    val webContextName: String? = null,
-    val namespaces: Map<String,URI> = emptyMap(),
-    val staticFolder: String = defaultStaticFolder,
-    val startMethod: String = defaultStartMethod,
-    val executeExpression: String? = null,
-)
-
 private val configWords = "conf,config,configuration".split(",")
 private val defaultExitWords = "exit,quit".split(",")
-private val startAudioWord = "audio"
-private val stopAudioWord = "stop"
-private val cancelAudioWord = "cancel"
+private val defaultStaticFolder = System.getProperty("user.dir")
+private const val startAudioWord = "audio"
+private const val stopAudioWord = "stop"
+private const val cancelAudioWord = "cancel"
 private const val defaultConsolePrompt = "\n? "
 private const val defaultResultPrompt = "= "
 private const val defaultExpressionPrompt = "-> "
-private const val defaultOutputFormat = "application/json"
-private const val defaultStaticFolder = "./"
-private const val defaultStartMethod = "console"
 private const val defaultWebContextName = "all"
 private var outputFormat: Format? = null
 private var defaultCharset = "utf8"
@@ -296,8 +271,6 @@ private fun setOutputFormat(txt: String): Boolean {
         outputFormat = format
         return true
     }
-    if (outputFormat == null)
-        outputFormat = getFormat(defaultOutputFormat)
     return false
 }
 

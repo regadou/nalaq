@@ -43,16 +43,6 @@ fun initRdfFormats(mimetypes: Collection<String>): Collection<RdfFormat> {
     return FORMAT_NAMES.values
 }
 
-interface Resource {
-    val id: String
-    val namespace: Namespace
-    val type: Type
-    val properties: Set<Property>
-    fun getPropertyValue(name: String): Any?
-    fun setPropertyValue(name: String, value: Any?): Boolean
-    fun addProperty(name: String, value: Any? = null): Boolean
-}
-
 class RdfResource(override val id: String, override val namespace: Namespace): Resource {
     override val type: Type get() = (values["rdf:type"] ?: "rdf:Resource").type()
     override val properties: Set<Property> get() = values.keys.map{RdfProperty(this, it)}.toSet()

@@ -17,7 +17,7 @@ import java.util.*
 import kotlin.reflect.KFunction
 
 class TranslateParser(): com.magicreg.nalaq.Parser {
-    private var translateEndpointUrl: URI? = null
+    private var translateEndpoint: URI? = null
 
     override fun parse(txt: String): Expression {
         val config = getContext().configuration
@@ -32,26 +32,10 @@ class TranslateParser(): com.magicreg.nalaq.Parser {
             "format" to "text",
             "q" to text
         )
-        val result = translateEndpoint().post(data, mapOf("content-type" to "application/json"))
+        if (translateEndpoint == null)
+            translateEndpoint = getContext().configuration.translateEndpoint ?: throw RuntimeException("translateEndpoint is not configured")
+        val result =translateEndpoint!!.post(data, mapOf("content-type" to "application/json"))
         return toMap(result)["translatedText"]?.toString() ?: result.toString()
-    }
-
-    private fun translateEndpoint(): URI {
-        if (translateEndpointUrl != null)
-            return translateEndpointUrl!!
-        val endpoint = getContext().configuration.translateEndpoint
-        if (endpoint.isNullOrBlank())
-            throw RuntimeException("translateEndpoint configuration is empty")
-        val port = endpoint.toIntOrNull()
-        if (port != null) {
-            val host = "localhost"
-            Runtime.getRuntime().exec(arrayOf("libretranslate", "--host", host, "--port", "$port"))
-            Thread.sleep(3000L)
-            translateEndpointUrl = URI("http://$host:$port/translate")
-        }
-        else
-            translateEndpointUrl = URI(endpoint)
-        return translateEndpointUrl!!
     }
 }
 

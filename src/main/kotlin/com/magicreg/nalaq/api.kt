@@ -3,8 +3,7 @@ package com.magicreg.nalaq
 import ezvcard.VCard
 import org.apache.commons.beanutils.BeanMap
 import org.jsoup.nodes.Element
-import java.io.ByteArrayOutputStream
-import java.io.File
+import java.io.*
 import java.lang.reflect.Constructor
 import java.lang.reflect.Field
 import java.lang.reflect.Member
@@ -24,8 +23,184 @@ import java.util.*
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.KProperty
+import kotlin.reflect.full.isSuperclassOf
 import kotlin.reflect.jvm.kotlinFunction
 import kotlin.reflect.jvm.reflect
+
+enum class CompareOperator(val symbol: String, val function: KFunction<Any?>) {
+    LESS("<", ::less_func), NOT_LESS(">=", ::not_less_func),
+    EQUAL("=", ::equal_func), NOT_EQUAL("!=", ::not_equal_func),
+    MORE(">", ::more_func), NOT_MORE("<=", ::not_more_func),
+    IN("@", ::in_func), NOT_IN("!@", ::not_in_func),
+    BETWEEN("><", ::between_func), NOT_BETWEEN("!><", ::not_between_func),
+    MATCH("~", ::match_func), NOT_MATCH("!~", ::not_match_func)
+}
+enum class LogicOperator { OR, AND }
+enum class SpeechEngine { VOSK, PICO }
+enum class TextParser { NALAQ, NLP, TRANSLATE }
+enum class UriMethod { GET, POST, PUT, DELETE }
+
+data class Configuration(
+    val consolePrompt: String? = null,
+    val resultPrompt: String? = null,
+    val expressionPrompt: String? = null,
+    val printConfig: Boolean = false,
+    val outputFormat: String? = null,
+    val exitWords: List<String> = emptyList(),
+    val textParser: TextParser = TextParser.entries[0],
+    val language: String = Locale.getDefault().language,
+    val targetLanguage: String? = null,
+    val translateEndpoint: URI? = null,
+    val nlpModelFolder: String? = null,
+    val speechEngine: SpeechEngine? = null,
+    val voskSpeechModel: URI? = null,
+    val picoAccessKey: String? = null,
+    val serverPort: Int? = null,
+    val webContextName: String? = null,
+    val namespaces: Map<String,URI> = emptyMap(),
+    val staticFolder: String = System.getProperty("user.dir"),
+    val startMethod: String? = null,
+    val executeExpression: String? = null,
+)
+
+class Expression(
+    val function: KFunction<Any?>? = null,
+    val parameters: List<Any?> = emptyList()
+) {
+    fun value(): Any? {
+        return if (function == null)
+            parameters.simplify(true)
+        else if (parameters.isEmpty())
+            function
+        else
+            function.execute(parameters)
+    }
+
+    override fun toString(): String {
+        val name = function?.name ?: ""
+        val space = if (function == null) "" else " "
+        return "("+name+space+parameters.joinToString(" ")+")"
+    }
+}
+
+interface Filterable {
+    fun filter(filter: Filter): List<Any?>
+}
+
+interface Format {
+    val mimetype: String
+    val extensions: List<String>
+    val supported: Boolean
+
+    fun decode(input: InputStream, charset: String): Any?
+    fun encode(value: Any?, output: OutputStream, charset: String)
+
+    fun decodeText(txt: String): Any? {
+        return decode(ByteArrayInputStream(txt.toByteArray(Charset.forName(defaultCharset()))), defaultCharset())
+    }
+
+    fun encodeText(value: Any?, charset: String = defaultCharset()): String {
+        val output = ByteArrayOutputStream()
+        encode(value, output, charset)
+        return output.toString(charset)
+    }
+}
+
+interface Namespace: Filterable {
+    val prefix: String
+    val uri: String
+    val readOnly: Boolean
+    val names: List<String>
+    fun hasName(name: String): Boolean
+    fun value(name: String): Any?
+    fun setValue(name: String, value: Any?): Boolean
+
+    override fun filter(filter: Filter): List<Any?> {
+        return filter.filter(names.map { value(it) })
+    }
+}
+
+interface Parser {
+    fun parse(txt: String): Expression
+}
+
+interface Property {
+    val name: String
+    val type: Type
+    val options: PropertyOptions
+    fun getValue(instance: Any?): Any?
+    fun setValue(instance: Any?, value: Any?): Boolean
+}
+
+data class PropertyOptions(
+    val size: Int? = null,
+    val minValue: Any? = null,
+    val maxValue: Any? = null,
+    val validValues: List<Any?> = emptyList(),
+    val primary: Boolean = false,
+    val nullable: Boolean = true,
+    val autoIncrement: Boolean = false,
+    val defaultValue: Any? = null,
+    val defaultUpdateValue: Any? = null,
+    val charset: String? = null,
+    val unsigned: Boolean = false
+)
+
+interface Reference: MutableMap.MutableEntry<String,Any?> {
+    override val key: String
+    override val value: Any?
+    val parent: Any?
+    val readOnly: Boolean
+}
+
+interface Resource {
+    val id: String
+    val namespace: Namespace
+    val type: Type
+    val properties: Set<Property>
+    fun getPropertyValue(name: String): Any?
+    fun setPropertyValue(name: String, value: Any?): Boolean
+    fun addProperty(name: String, value: Any? = null): Boolean
+}
+
+interface SpeechProcessor: Runnable {
+    fun isRunning(): Boolean
+    fun wasStopped(): Boolean
+    fun stopRunning()
+    fun start()
+}
+
+interface Type {
+    val name: String
+    val parentType: Type
+    val childrenTypes: List<Type>
+    val rootType: Type
+    val classes: List<KClass<*>>
+    fun properties(instance: Any? = null): List<String>
+    fun property(name: String, instance: Any? = null): Property
+    fun newInstance(args: List<Any?>): Any?
+    fun isInstance(value: Any?): Boolean
+}
+
+interface View {
+    val uri: URI
+    val ets: String
+    val description: String?
+}
+
+fun <T: Any> convert(value: Any?, type: KClass<T>): T {
+    if (type.isInstance(value))
+        return value as T
+    if (value.isReference())
+        return convert(value.resolve(), type)
+    val converter = getConverter(type)
+    if (converter != null)
+        return converter.call(value) as T
+    if (Date::class.isSuperclassOf(type))
+        return toUtilDate(value) as T
+    val srcClass = if (value == null) Void::class else value::class
+    throw RuntimeException("Cannot convert ${srcClass.qualifiedName} to ${type.qualifiedName}")
+}
 
 fun Any?.type(): Type {
     if (this is Type)
@@ -215,71 +390,6 @@ fun Any?.toPlainText(): String {
     return type+" "+map.values.iterator().next().toPlainText()
 }
 
-fun Any?.isFunction(): Boolean {
-    return this is KFunction<*> || this is Method || this is Constructor<*> || this is Function<*>
-}
-
-fun Any?.toFunction(): KFunction<Any?>? {
-    if (this is KFunction<*>)
-        return this
-    if (this is Method)
-        return this.kotlinFunction
-    if (this is Constructor<*>)
-        return this.kotlinFunction
-    if (this is Function<*>) {
-        val fn = this.reflect()
-        if (fn != null)
-            return fn
-        // TODO: we might want to convert it to a java method if the call() function does not work
-    }
-    // TODO: can we detect functional interface and convert it to a KFunction ?
-    // TODO: if (value is Type or KClass or Class) return the constructor of this type
-    // TODO: if (value is Collection or Array) use as parameters to construct a NaLaQFunction
-    return null
-}
-
-fun Any?.toCompareOperator(throwOnFail: Boolean = false): CompareOperator? {
-    if (this is CompareOperator)
-        return this
-    if (this is String) {
-        for (op in CompareOperator.entries) {
-            if (op.symbol == this)
-                return op
-        }
-    }
-    if (this is KFunction<Any?>) {
-        if (this == ::is_func)
-            return CompareOperator.EQUAL
-        for (op in CompareOperator.entries) {
-            if (op.function == this)
-                return op
-        }
-    }
-    if (throwOnFail)
-        throw RuntimeException("Invalid compare operator: $this")
-    else
-        return null
-}
-
-fun Any?.toLogicOperator(throwOnFail: Boolean = false): LogicOperator? {
-    if (this is KFunction<Any?>) {
-        when(this) {
-            ::and_func -> return LogicOperator.AND
-            ::or_func -> return LogicOperator.OR
-        }
-    }
-    if (this is String) {
-        when(this.uppercase()) {
-            "AND", "&", "&&" -> return LogicOperator.AND
-            "OR",  "|", "||" -> return LogicOperator.OR
-        }
-    }
-    if (throwOnFail)
-        throw RuntimeException("Invalid logic operator: $this")
-    else
-        return null
-}
-
 fun Any?.isIterable(): Boolean {
     if (this == null)
         return false
@@ -388,17 +498,143 @@ fun Any?.toUri(): URI? {
     return null
 }
 
-fun String?.fileType(): String? {
-    if (this == null)
+fun URI.readOnly(): Boolean {
+    val uri = resolveRelativeTemplate(this)
+    if (uri.scheme == "data" && uri.toString().indexOf(",") < 0)
+        return false
+    return getNamespace(uri.scheme)?.readOnly ?: arrayOf("data", "geo", "nalaq").contains(uri.scheme)
+}
+
+fun URI.contentType(): String? {
+    return when (this.scheme) {
+        "data" -> this.toString().split(",")[0].split(";")[0].split(":")[1]
+        "file" -> if (getContext().realFile(this.path).isDirectory) "inode/directory" else detectFileType(this.path)
+        "ftp", "sftp", "ftps" -> detectFileType(this.path)
+        "http", "https" -> {
+            val type = this.toURL().openConnection().contentType
+            if (type == null) null else type.split(";")[0].trim()
+        }
+        else -> null
+    }
+}
+
+fun URI.get(headers: Map<String,String> = mapOf()): Any? {
+    return resolveUri(resolveRelativeTemplate(this), UriMethod.GET, headers, null)
+}
+
+fun URI.post(value: Any?, headers: Map<String,String> = mapOf()): Any? {
+    return resolveUri(resolveRelativeTemplate(this), UriMethod.POST, headers, value)
+}
+
+fun URI.put(value: Any?, headers: Map<String,String> = mapOf()): Any? {
+    return resolveUri(resolveRelativeTemplate(this), UriMethod.PUT, headers, value)
+}
+
+fun URI.delete(headers: Map<String,String> = mapOf()): Any? {
+    return resolveUri(resolveRelativeTemplate(this), UriMethod.DELETE, headers, null)
+}
+
+fun Any?.toCompareOperator(throwOnFail: Boolean = false): CompareOperator? {
+    if (this is CompareOperator)
+        return this
+    if (this is String) {
+        for (op in CompareOperator.entries) {
+            if (op.symbol == this)
+                return op
+        }
+    }
+    if (this is KFunction<Any?>) {
+        if (this == ::is_func)
+            return CompareOperator.EQUAL
+        for (op in CompareOperator.entries) {
+            if (op.function == this)
+                return op
+        }
+    }
+    if (throwOnFail)
+        throw RuntimeException("Invalid compare operator: $this")
+    else
         return null
-    var parts = this.split("/")
-    val filename = parts[parts.size-1]
-    if (filename == "" || filename.indexOf(".") < 0)
+}
+
+fun Any?.toLogicOperator(throwOnFail: Boolean = false): LogicOperator? {
+    if (this is KFunction<Any?>) {
+        when(this) {
+            ::and_func -> return LogicOperator.AND
+            ::or_func -> return LogicOperator.OR
+        }
+    }
+    if (this is String) {
+        when(this.uppercase()) {
+            "AND", "&", "&&" -> return LogicOperator.AND
+            "OR",  "|", "||" -> return LogicOperator.OR
+        }
+    }
+    if (throwOnFail)
+        throw RuntimeException("Invalid logic operator: $this")
+    else
         return null
-    if (filename[0] == '.')
-        return "text/plain"
-    parts = filename.split(".")
-    return getExtensionMimetype(parts[parts.size-1])
+}
+
+fun Any?.toFunction(): KFunction<Any?>? {
+    if (this is KFunction<*>)
+        return this
+    if (this is Method)
+        return this.kotlinFunction
+    if (this is Constructor<*>)
+        return this.kotlinFunction
+    if (this is Function<*>) {
+        val fn = this.reflect()
+        if (fn != null)
+            return fn
+        // TODO: we might want to convert it to a java method if the call() function does not work
+    }
+    // TODO: can we detect functional interface and convert it to a KFunction ?
+    // TODO: if (value is Type or KClass or Class) return the constructor of this type
+    // TODO: if (value is Collection or Array) use as parameters to construct a NaLaQFunction
+    return null
+}
+
+fun Any?.isFunction(): Boolean {
+    return this is KFunction<*> || this is Method || this is Constructor<*> || this is Function<*>
+}
+
+fun KFunction<*>.precedence(): Int {
+    return functionPrecedence(this)
+}
+
+fun KFunction<*>.execute(parameters: List<Any?>): Any? {
+    val funcParams = this.parameters
+    if (funcParams.isEmpty())
+        return this.call()
+
+    if (funcParams.size == 1) {
+        val param = funcParams[0]
+        val type = param.type.classifier!! as KClass<*>
+        if (param.isVararg)
+            return parameters.map{convert(it,type)}.toTypedArray()
+        if (type.isInstance(parameters))
+            return arrayOf(parameters)
+        val value = if (parameters.isEmpty()) null else parameters[0]
+        return arrayOf(convert(value, type))
+    }
+
+    val targetParams = mutableListOf<Any?>()
+    for ((index,param) in funcParams.withIndex()) {
+        val value = if (index >= parameters.size) null else parameters[index]
+        targetParams.add(convert(value, param.type.classifier!! as KClass<*>))
+    }
+    val lastParam = funcParams[funcParams.size-1]
+    if (lastParam.isVararg) {
+        val type = lastParam.type.classifier!! as KClass<*>
+        var left = parameters.size - funcParams.size
+        while (left > 0) {
+            targetParams.add(convert(parameters[parameters.size-left], type))
+            left--
+        }
+    }
+
+    return this.call(*targetParams.toTypedArray())
 }
 
 fun String.detectFormat(createDataUri: Boolean = false): String? {

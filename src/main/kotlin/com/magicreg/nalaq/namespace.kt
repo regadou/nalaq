@@ -21,20 +21,6 @@ fun loadNamespace(prefix: String, uri: URI, readOnly: Boolean): Namespace {
     return ns
 }
 
-interface Namespace: Filterable {
-    val prefix: String
-    val uri: String
-    val readOnly: Boolean
-    val names: List<String>
-    fun hasName(name: String): Boolean
-    fun value(name: String): Any?
-    fun setValue(name: String, value: Any?): Boolean
-
-    override fun filter(filter: Filter): List<Any?> {
-        return filter.filter(names.map { value(it) })
-    }
-}
-
 class NaLaQNamespace (
     override val prefix: String = "_",
     override val uri: String = "http://localhost/",

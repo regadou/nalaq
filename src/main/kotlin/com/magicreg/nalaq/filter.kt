@@ -2,7 +2,6 @@ package com.magicreg.nalaq
 
 import java.util.*
 import org.jsoup.nodes.Element
-import kotlin.reflect.KFunction
 
 fun compare(v1: Any?, v2: Any?): Int {
     if (v1 == null || v2 == null) {
@@ -44,23 +43,6 @@ fun compare(v1: Any?, v2: Any?): Int {
     if (v1 is Number || v1 is Boolean || v2 is Number || v2 is Boolean)
         return toDouble(v1).compareTo(toDouble(v2))
     return toString(v1).normalize().compareTo(toString(v2).normalize())
-}
-
-enum class LogicOperator {
-    OR, AND
-}
-
-enum class CompareOperator(val symbol: String, val function: KFunction<Any?>) {
-    LESS("<", ::less_func), NOT_LESS(">=", ::not_less_func),
-    EQUAL("=", ::equal_func), NOT_EQUAL("!=", ::not_equal_func),
-    MORE(">", ::more_func), NOT_MORE("<=", ::not_more_func),
-    IN("@", ::in_func), NOT_IN("!@", ::not_in_func),
-    BETWEEN("><", ::between_func), NOT_BETWEEN("!><", ::not_between_func),
-    MATCH("~", ::match_func), NOT_MATCH("!~", ::not_match_func)
-}
-
-interface Filterable {
-    fun filter(filter: Filter): List<Any?>
 }
 
 class Filter(key: String? = null, compare: Any? = null, value: Any? = null): Iterable<Map<String,Any?>> {

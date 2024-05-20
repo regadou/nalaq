@@ -46,23 +46,17 @@ fun getMimetypeExtensions(txt: String): List<String> {
     return format?.extensions ?: listOf()
 }
 
-interface Format {
-    val mimetype: String
-    val extensions: List<String>
-    val supported: Boolean
-
-    fun decode(input: InputStream, charset: String): Any?
-    fun encode(value: Any?, output: OutputStream, charset: String)
-
-    fun decodeText(txt: String): Any? {
-        return decode(ByteArrayInputStream(txt.toByteArray(Charset.forName(defaultCharset()))), defaultCharset())
-    }
-
-    fun encodeText(value: Any?, charset: String = defaultCharset()): String {
-        val output = ByteArrayOutputStream()
-        encode(value, output, charset)
-        return output.toString(charset)
-    }
+fun detectFileType(path: String?): String? {
+    if (path == null)
+        return null
+    var parts = path.trim().split("/")
+    val filename = parts[parts.size-1]
+    if (filename == "" || filename.indexOf(".") < 0)
+        return null
+    if (filename[0] == '.')
+        return "text/plain"
+    parts = filename.split(".")
+    return getExtensionMimetype(parts[parts.size-1])
 }
 
 class NaLaQFormat(

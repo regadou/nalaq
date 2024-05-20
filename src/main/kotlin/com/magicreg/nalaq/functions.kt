@@ -7,12 +7,12 @@ import java.io.Writer
 import kotlin.reflect.*
 import kotlin.reflect.full.createType
 
-fun KFunction<*>.precedence(): Int {
-    return FUNCTION_PRECEDENCE_MAP[this] ?: DEFAULT_PRECEDENCE
-}
-
 fun builtinOperators(): Collection<KFunction<Any?>> {
     return FUNCTION_PRECEDENCE_MAP.keys
+}
+
+fun functionPrecedence(function: KFunction<*>): Int {
+    return FUNCTION_PRECEDENCE_MAP[function] ?: DEFAULT_PRECEDENCE
 }
 
 fun get_func(args: List<Any?>): Any? {
@@ -301,7 +301,7 @@ fun each_func(args: List<Any?>): Any? {
 
 fun do_func(args: List<Any?>): Any? {
     val cx = getContext()
-    val format = getFormat(cx.configuration.outputFormat) ?: getFormat("text/plain")!!
+    val format = getFormat(cx.configuration.outputFormat ?: "text/plain")!!
     var value: Any? = null
     for (arg in args) {
         if (cx.configuration.expressionPrompt != null)

@@ -105,18 +105,6 @@ fun getTypeFromData(data: Collection<*>, name: String? = null): Type {
 fun anyType(): Type { return ANY_TYPE }
 fun nullProperty(): Property { return NULL_PROPERTY }
 
-interface Type {
-    val name: String
-    val parentType: Type
-    val childrenTypes: List<Type>
-    val rootType: Type
-    val classes: List<KClass<*>>
-    fun properties(instance: Any? = null): List<String>
-    fun property(name: String, instance: Any? = null): Property
-    fun newInstance(args: List<Any?>): Any?
-    fun isInstance(value: Any?): Boolean
-}
-
 class NaLaQType(
     override val name: String,
     override val parentType: Type,
@@ -211,14 +199,6 @@ class NaLaQType(
     }
 }
 
-interface Property {
-    val name: String
-    val type: Type
-    val options: PropertyOptions
-    fun getValue(instance: Any?): Any?
-    fun setValue(instance: Any?, value: Any?): Boolean
-}
-
 class NaLaQProperty(
     override val name: String,
     override val type: Type,
@@ -300,20 +280,6 @@ class SelfProperty(): Property {
         return false
     }
 }
-
-data class PropertyOptions(
-    val size: Int? = null,
-    val minValue: Any? = null,
-    val maxValue: Any? = null,
-    val validValues: List<Any?> = emptyList(),
-    val primary: Boolean = false,
-    val nullable: Boolean = true,
-    val autoIncrement: Boolean = false,
-    val defaultValue: Any? = null,
-    val defaultUpdateValue: Any? = null,
-    val charset: String? = null,
-    val unsigned: Boolean = false
-)
 
 private class AnyType(): Type {
     override val name = "any"
