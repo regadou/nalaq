@@ -15,7 +15,7 @@ fun compileTokens(vararg tokens: Any?): Expression {
     return compileExpressions(ParserStatus(tokens.toList() as List<List<Any?>>), true)
 }
 
-enum class TextParser {NALAQ, NLP}
+enum class TextParser {NALAQ, NLP, TRANSLATE}
 
 interface Parser {
     fun parse(txt: String): Expression

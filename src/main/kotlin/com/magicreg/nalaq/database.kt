@@ -450,8 +450,6 @@ class SqlPrintStream(val db: Database, private val buffer: ByteArrayOutputStream
 
     override fun write(buf: ByteArray) { print(buf.joinToString("")) }
 
-    override fun writeBytes(buf: ByteArray) { print(buf.joinToString("")) }
-
     override fun print(b: Boolean) { print(b.toString()) }
 
     override fun print(c: Char) { print(c.toString()) }

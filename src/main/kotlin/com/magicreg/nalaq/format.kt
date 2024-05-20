@@ -171,7 +171,7 @@ private fun initManagedMimetypes(): MutableMap<String,Format> {
     val formats = mutableMapOf<String,Format>()
 
     addMimetype(formats, ::decodeBytes, ::encodeBytes, "application/octet-stream", listOf("bin"))
-    addMimetype(formats, ::decodeString, ::encodeString, "text/plain", listOf("txt"))
+    addMimetype(formats, ::decodeString, ::encodeTextPlain, "text/plain", listOf("txt"))
     addMimetype(formats, ::decodeProperties, ::encodeProperties, "text/x-java-properties", listOf("properties"))
     addMimetype(formats, ::decodeCsv, ::encodeCsv,"text/csv", listOf("csv"))
     addMimetype(formats, ::decodeUris, ::encodeUris,"text/uri-list", listOf("uris", "uri"))
@@ -218,6 +218,11 @@ private fun decodeString(input: InputStream, charset: String): Any? {
 private fun encodeString(value: Any?, output: OutputStream, charset: String) {
     if (value != null)
         output.write(toString(value).toByteArray(Charset.forName(charset)))
+}
+
+private fun encodeTextPlain(value: Any?, output: OutputStream, charset: String) {
+    if (value != null)
+        output.write(value.toPlainText().toByteArray(Charset.forName(charset)))
 }
 
 private fun decodeBytes(input: InputStream, charset: String): Any? {

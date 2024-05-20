@@ -9,7 +9,7 @@ group = "com.magicreg"
 version = "0.1-SNAPSHOT"
 
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(11)
 }
 
 repositories {

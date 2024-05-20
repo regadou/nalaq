@@ -5,7 +5,7 @@ import java.net.URI
 import org.apache.commons.beanutils.BeanMap
 import java.util.*
 
-class Person(
+data class Person(
     var id: String? = null,
     var name: String? = null,
     var firstName: String? = null,

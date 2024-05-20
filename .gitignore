@@ -55,4 +55,4 @@ nb-configuration.xml
 *.db
 webapp/json/contact.json
 private
-
+db

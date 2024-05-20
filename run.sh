@@ -14,12 +14,4 @@ if [ ! -d $folder ]; then
     gradle distZip || exit
     unzip build/dis*/* -d build || exit
 fi
-if [ "$1" = "config" ]; then
-   config=config
-   shift
-   param="$1"
-   shift
-   build/nalaq*/bin/nalaq $config "$param" "$@"
-else
-   build/nalaq*/bin/nalaq "$@"
-fi
+build/nalaq*/bin/nalaq "$@"

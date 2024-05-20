@@ -186,7 +186,8 @@ class Context(
         }
         parser = when (configuration.textParser) {
             TextParser.NALAQ -> NaLaQParser()
-            TextParser.NLP -> OpenNLPParser(configuration.nlpModelFolder ?: throw RuntimeException("NLP model folder was not specified"))
+            TextParser.NLP -> NlpParser(configuration.nlpModelFolder ?: throw RuntimeException("NLP model folder was not specified"))
+            TextParser.TRANSLATE -> TranslateParser()
         }
         return parser!!
     }

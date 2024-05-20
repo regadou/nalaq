@@ -108,10 +108,6 @@ fun Any?.pathValue(path: List<String>, value: Any?): Boolean {
     return node?.type()?.property(last, node)?.setValue(node, value) ?: false
 }
 
-fun Any?.isPrimitive(): Boolean {
-    return this == null || this is Number || this is Boolean || this.isText()
-}
-
 fun Any?.isReference(): Boolean {
     return this is Reference || this is URI || this is URL || this is File
         || this is KProperty<*> || this is Field || this is Property || this is Map.Entry<*,*>
@@ -137,9 +133,13 @@ fun Any?.toReference(): Reference? {
     return null
 }
 
+fun Any?.isPrimitive(): Boolean {
+    return this == null || this is Number || this is Boolean || this.isText()
+}
+
 fun Any?.isText(): Boolean {
     return this is CharSequence || this is Char || this is File || this is URI || this is URL || this is CharArray || this is ByteArray
-            || (this is Array<*> && (this.isArrayOf<Char>() || this.isArrayOf<Byte>()))
+                                || (this is Array<*> && (this.isArrayOf<Char>() || this.isArrayOf<Byte>()))
 }
 
 fun Any?.toText(): String {
@@ -170,6 +170,49 @@ fun Any?.toText(): String {
     if (this == null)
         return ""
     return this.toString()
+}
+
+fun Any?.toPlainText(): String {
+    if (this == null)
+        return "none" // should be the language text for en:none or json:null
+    if (this.isPrimitive())
+        return this.toText()
+    if (this is Property)
+        return this.name
+    if (this is Type)
+        return this.name
+    if (this is KClass<*>)
+        return this.simpleName ?: this.toString()
+    if (this is Class<*>)
+        return this.simpleName
+    if (this.isFunction())
+        return this.toFunction()?.name ?: this.toString()
+    if (this.isReference())
+        return this.toReference()!!.value.toPlainText()
+    if (this.isIterable()) {
+        val value = this.toIterator()!!.asSequence().toList().simplify(true)
+        if (value is Collection<*>)
+            return value.joinToString(" ") { it.toPlainText() }
+        return value.toPlainText()
+    }
+    if (this is Namespace)
+        return this.uri
+    if (this is Element)
+        return this.baseUri()
+    if (this is View)
+        return this.uri.toString()
+    val map: Map<String,Any?> = if (this is Map<*,*>)
+        this.mapKeys { it.toPlainText() }
+    else if (this is Resource)
+        this.toMap()!! as Map<String,Any?>
+    else
+        BeanMap(this) as Map<String,Any?>
+    var type = this.type().name
+    for (key in arrayOf("name","id")) {
+        if (map.containsKey(key))
+            return type+" "+map[key].toPlainText()
+    }
+    return type+" "+map.values.iterator().next().toPlainText()
 }
 
 fun Any?.isFunction(): Boolean {

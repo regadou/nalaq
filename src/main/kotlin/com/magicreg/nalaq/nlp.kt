@@ -12,10 +12,50 @@ import opennlp.tools.util.Span
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
+import java.net.URI
 import java.util.*
 import kotlin.reflect.KFunction
 
-class OpenNLPParser(
+class TranslateParser(): com.magicreg.nalaq.Parser {
+    private var translateEndpointUrl: URI? = null
+
+    override fun parse(txt: String): Expression {
+        val config = getContext().configuration
+        val result = if (config.targetLanguage.isNullOrBlank()) txt else translate(config.language, config.targetLanguage, txt)
+        return Expression(null, listOf(result))
+    }
+
+    fun translate(sourceLang: String, targetLang: String, text: String ): String {
+        val data = mapOf(
+            "source" to sourceLang,
+            "target" to targetLang,
+            "format" to "text",
+            "q" to text
+        )
+        val result = translateEndpoint().post(data, mapOf("content-type" to "application/json"))
+        return toMap(result)["translatedText"]?.toString() ?: result.toString()
+    }
+
+    private fun translateEndpoint(): URI {
+        if (translateEndpointUrl != null)
+            return translateEndpointUrl!!
+        val endpoint = getContext().configuration.translateEndpoint
+        if (endpoint.isNullOrBlank())
+            throw RuntimeException("translateEndpoint configuration is empty")
+        val port = endpoint.toIntOrNull()
+        if (port != null) {
+            val host = "localhost"
+            Runtime.getRuntime().exec(arrayOf("libretranslate", "--host", host, "--port", "$port"))
+            Thread.sleep(3000L)
+            translateEndpointUrl = URI("http://$host:$port/translate")
+        }
+        else
+            translateEndpointUrl = URI(endpoint)
+        return translateEndpointUrl!!
+    }
+}
+
+class NlpParser(
     private val modelFolder: String,
     private val dictionary: Map<*, *> = TreeMap<Any?, Any?>(),
     lazyLoading: Boolean = false,

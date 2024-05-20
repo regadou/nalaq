@@ -1,41 +1,55 @@
 package com.magicreg.nalaq
 
+import org.apache.commons.beanutils.BeanMap
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.URI
+import java.util.*
 import kotlin.reflect.KFunction
 
 fun runConfiguration(config: Configuration) {
-    val cx = getContext(config)
+    getContext(config)
     setOutputFormat(config.outputFormat)
     if (config.printConfig)
         println("configuration = "+getFormat(config.outputFormat)!!.encodeText(config))
+    if (!config.executeExpression.isNullOrBlank())
+        executeExpression(config)
     when (config.startMethod) {
         "server" -> startServer(config)
         "console" -> startConsole(config)
-        "expression" -> executeExpression(config)
-        else -> throw RuntimeException("Invalid start method: ${config.startMethod}\nValid values are server, console or expression")
+        "expression", "noop" -> {}
+        else -> throw RuntimeException("Invalid start method: ${config.startMethod}\nValid values are server, console, expression or noop")
     }
 }
 
 fun loadConfiguration(args: Array<String>): Configuration? {
-    if (args.size < 2 || !configWords.contains(args[0]))
-        return null
-    if (args[1] == "debug") {
+    var offset = 0
+    var param = if (args.isEmpty() || !configWords.contains(args[0]))
+        configWords.map { System.getenv("NALAQ_"+it.uppercase()) }.filterNotNull().firstOrNull() ?: return null
+    else if (args.size == 1 || args[1] == "help")
+        return printHelp()
+    else if (args[1] == "debug") {
         val exp = if (args.size > 2) args.toList().subList(2, args.size).joinToString(" ") else null
         return defaultConfiguration(exp, true)
     }
-    val uri = args[1].toUri() ?: args[1].detectFormat(true)?.toUri() ?: throw RuntimeException("Invalid configuration uri: ${args[1]}")
+    else {
+        offset = 2
+        args[1]
+    }
+
+    val uri = param.toUri() ?: param.detectFormat(true)?.toUri() ?: return printHelp("Invalid configuration uri: ${args[1]}")
     val value = uri.get().resolve()
     if (value is Exception)
         throw value
+
     val configData = toMap(value)
     var start: String? = null
     var exp: String? = null
     if (args.size > 2) {
         start = "expression"
-        exp = args.toList().subList(2, args.size).joinToString(" ")
+        exp = args.toList().subList(offset, args.size).joinToString(" ")
     }
+
     return Configuration(
         consolePrompt = if (configData.containsKey("consolePrompt")) configData["consolePrompt"]?.toString() else defaultConsolePrompt,
         resultPrompt = if (configData.containsKey("resultPrompt")) configData["resultPrompt"]?.toString() else defaultResultPrompt,
@@ -43,6 +57,9 @@ fun loadConfiguration(args: Array<String>): Configuration? {
         printConfig = toBoolean(configData["printConfig"]),
         outputFormat = configData["outputFormat"]?.toString() ?: defaultOutputFormat,
         exitWords = getListValues(configData["exitWords"], defaultExitWords),
+        language = configData["language"]?.toString() ?: Locale.getDefault().language,
+        targetLanguage = configData["targetLanguage"]?.toString(),
+        translateEndpoint = configData["translateEndpoint"]?.toString(),
         textParser = selectedEnum(TextParser::values, configData["textParser"]) ?: TextParser.entries[0],
         nlpModelFolder = configData["nlpModelFolder"]?.toString(),
         speechEngine = selectedEnum(SpeechEngine::values, configData["speechEngine"]),
@@ -52,7 +69,7 @@ fun loadConfiguration(args: Array<String>): Configuration? {
         webContextName = if (configData.containsKey("webContextName")) configData["webContextName"]?.toString() else defaultWebContextName,
         namespaces = getMapUris(configData["namespaces"], ::loadNamespace),
         staticFolder = configData["staticFolder"]?.toString() ?: defaultStaticFolder,
-        startMethod = start ?: configData["startMethod"]?.toString() ?: defaultStartMethod,
+        startMethod =  configData["startMethod"]?.toString() ?: start ?: defaultStartMethod,
         executeExpression = exp ?: configData["executeExpression"]?.toString()
     )
 }
@@ -68,6 +85,9 @@ fun defaultConfiguration(expression: String? = null, debug: Boolean = false): Co
         printConfig = debug,
         outputFormat = defaultOutputFormat,
         exitWords = defaultExitWords,
+        language = Locale.getDefault().language,
+        targetLanguage = null,
+        translateEndpoint = null,
         textParser = TextParser.entries[0],
         nlpModelFolder = null,
         speechEngine = null,
@@ -89,23 +109,26 @@ fun defaultCharset(charset: String? = null): String {
 }
 
 data class Configuration(
-    val consolePrompt: String?,
-    val resultPrompt: String?,
-    val expressionPrompt: String?,
-    val printConfig: Boolean,
-    val outputFormat: String,
-    val exitWords: List<String>,
-    val textParser: TextParser,
-    val nlpModelFolder: String?,
-    val speechEngine: SpeechEngine?,
-    val voskSpeechModel: URI?,
-    val picoAccessKey: String?,
-    val serverPort: Int?,
-    val webContextName: String?,
-    val namespaces: Map<String,URI>,
-    val staticFolder: String,
-    val startMethod: String,
-    val executeExpression: String?,
+    val consolePrompt: String? = null,
+    val resultPrompt: String? = null,
+    val expressionPrompt: String? = null,
+    val printConfig: Boolean = false,
+    val outputFormat: String = defaultOutputFormat,
+    val exitWords: List<String> = emptyList(),
+    val textParser: TextParser = TextParser.entries[0],
+    val language: String = Locale.getDefault().language,
+    val targetLanguage: String? = null,
+    val translateEndpoint: String? = null,
+    val nlpModelFolder: String? = null,
+    val speechEngine: SpeechEngine? = null,
+    val voskSpeechModel: URI? = null,
+    val picoAccessKey: String? = null,
+    val serverPort: Int? = null,
+    val webContextName: String? = null,
+    val namespaces: Map<String,URI> = emptyMap(),
+    val staticFolder: String = defaultStaticFolder,
+    val startMethod: String = defaultStartMethod,
+    val executeExpression: String? = null,
 )
 
 private val configWords = "conf,config,configuration".split(",")
@@ -122,6 +145,20 @@ private const val defaultStartMethod = "console"
 private const val defaultWebContextName = "all"
 private var outputFormat: Format? = null
 private var defaultCharset = "utf8"
+
+private fun printHelp(message: String? = null): Configuration {
+    val params = BeanMap(defaultConfiguration()).entries.filter{it.key!="class"}.map{ "  - ${it.key}: ${getFormat("json")!!.encodeText(it.value).trim()}" }.sorted()
+    if (message != null)
+        println(message)
+    println("Usage: nalaq [config <keyword|uri|data>] [<expression> ...]")
+    println("- supported configuration keywords: debug, help")
+    println("- supported configuration uri schemes: http, https, file, data")
+    println("- configuration can also auto-detect some data file formats: json, yaml, csv, urlencoded form")
+    println("- you can also pass configuration data with the NALAG_CONFIG environment variable")
+    println("- list of configuration parameters with their default values:")
+    println(params.joinToString("\n"))
+    return Configuration(startMethod = "noop")
+}
 
 private fun getListValues(value: Any?, defaultValue: List<String>): List<String> {
     return (
@@ -181,11 +218,14 @@ private fun startConsole(config: Configuration) {
             System.out.flush()
         }
         val txt = if (speechInput != null) {
-            val inputText = speechInput.readLine().trim()
-            println(inputText)
+            val inputText = speechInput.readLine()?.trim()
+            if (!inputText.isNullOrBlank())
+                println(inputText)
             inputText
-        } else textInput.readLine().trim()
-        if (txt.isBlank())
+        }
+        else
+            textInput.readLine()?.trim()
+        if (txt.isNullOrBlank())
             continue
         if (config.exitWords.contains(txt))
             running = false
@@ -216,6 +256,8 @@ private fun startConsole(config: Configuration) {
         }
         else if (setOutputFormat(txt))
             println("output format set to ${outputFormat?.mimetype}")
+        else if (txt == "help")
+            printHelp()
         else {
             try {
                 val value = execute(txt, config.expressionPrompt)
