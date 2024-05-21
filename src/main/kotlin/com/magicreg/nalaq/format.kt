@@ -117,7 +117,7 @@ private fun configureJsonMapper(mapper: ObjectMapper): ObjectMapper {
 
 private fun loadMimeTypesFile(): MutableMap<String,Format> {
     val mimetypes = initManagedMimetypes()
-    val reader = BufferedReader(FileReader("/etc/mime.types"))
+    val reader = BufferedReader(InputStreamReader(NaLaQFormat::class.java.getResource("/mime.types").openStream()))
     reader.lines().forEach { line ->
         val escape = line.indexOf('#')
         val txt = if (escape >= 0) line.substring(0, escape) else line

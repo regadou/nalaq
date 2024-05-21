@@ -47,13 +47,14 @@ data class Configuration(
     val printConfig: Boolean = false,
     val outputFormat: String? = null,
     val exitWords: List<String> = emptyList(),
-    val textParser: TextParser = TextParser.entries[0],
     val language: String = Locale.getDefault().language,
     val targetLanguage: String? = null,
     val translateEndpoint: URI? = null,
+    val voiceCommand: String? = null,
+    val textParser: TextParser = TextParser.entries[0],
     val nlpModelFolder: String? = null,
     val speechEngine: SpeechEngine? = null,
-    val voskSpeechModel: URI? = null,
+    val voskModelFolder: URI? = null,
     val picoAccessKey: String? = null,
     val serverPort: Int? = null,
     val webContextName: String? = null,
@@ -103,6 +104,17 @@ interface Format {
         val output = ByteArrayOutputStream()
         encode(value, output, charset)
         return output.toString(charset)
+    }
+}
+
+data class Language(
+    val name: String,
+    val code: String,
+    val voice: String,
+    val model: String
+) {
+    override fun toString(): String {
+        return name
     }
 }
 

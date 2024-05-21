@@ -49,7 +49,7 @@ fun toByteArray(value: Any?): ByteArray {
     if (value is Number)
         return value.toBytes()
     if (value is Boolean)
-        return (if (value) 1 else 0).toBytes()
+        return (if (value) 1 else 0).toByte().toBytes()
     if (value is Collection<*>) {
         val bytes = ByteArrayOutputStream()
         for (item in value)
@@ -561,6 +561,12 @@ fun toInputStream(value: Any?): InputStream {
         return value.openStream()
     if (value == null)
         return System.`in`
+    if (value.isText()) {
+        val txt = value.toText()
+        val uri = txt.toUri()
+        if (uri != null)
+            return uri.toURL().openConnection().getInputStream()
+    }
     return ByteArrayInputStream(toByteArray(value))
 }
 
@@ -588,7 +594,9 @@ fun toOutputStream(value: Any?): OutputStream {
         if (uri != null)
             return uri.toURL().openConnection().getOutputStream()
     }
-    return ByteArrayOutputStream()
+    val output = ByteArrayOutputStream()
+    output.write(toByteArray(value))
+    return output
 }
 
 fun toView(value: Any?): View {
@@ -608,11 +616,15 @@ fun toAudioStream(value: Any?): AudioStream {
     }
     else if (value is InputStream)
         audio.inputAudio(value)
-    /* TODO:
-       - array or collection of numbers -> convert to ByteArray
-       - isText() -> use text to speech
-       - is midi -> convert to audio with default sound bank
-     */
+    else if (value == null)
+        audio.inputAudio(microphoneInput())
+    else if (value.isText()) {
+        val speaker = getSpeechWriter()
+        if (speaker != null)
+            audio.inputAudio(speaker.inputStream)
+    }
+    // TODO: else if (value is Collection || value::class.java.isArray)
+    // TODO: else if (value is javax.sound.midi.Sequence)
     else {
         val uri = value.toUri()
         if (uri != null && uri.contentType()?.startsWith("audio/") == true)
@@ -811,7 +823,7 @@ private fun numericValue(value: Any?, defaultValue: Number?): Number? {
     if (value is Number)
         return value
     if (value is Boolean)
-        return if (value) 1 else 0
+        return (if (value) 1 else 0).toByte()
     if (value == null)
         return 0
     if (value.isText()) {

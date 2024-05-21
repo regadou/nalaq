@@ -159,7 +159,7 @@ private fun loadDefaultNamespaces() {
     }
     for (prefix in DEFAULT_PREFIXES.keys) {
         val ns = DEFAULT_NAMESPACES[prefix]!!
-        val input = RdfFormat::class.java.getResource("/$prefix.ttl").openStream()
+        val input = RdfFormat::class.java.getResource("/rdf/$prefix.ttl").openStream()
         val map = mutableMapOf<String,Any>()
         for (resource in decodeRdf(RDFFormat.TURTLE.name, input)) {
             if (resource.namespace == ns)

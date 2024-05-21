@@ -9,15 +9,24 @@ import java.io.*
 import java.net.URI
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.sound.sampled.*
 
-fun speechInputStream(uri: URI?): BufferedReader {
+fun microphoneInput(audioFormat: AudioFormat = defaultAudioFormat): AudioInputStream {
+    val format = audioFormat
+    val targetLine = AudioSystem.getTargetDataLine(format)
+    targetLine.open(format)
+    targetLine.start()
+    return AudioInputStream(targetLine)
+}
+
+fun speechInputStream(uri: URI?, audioFormat: AudioFormat = defaultAudioFormat): BufferedReader {
     val key = uri?.toString() ?: ""
     val oldReader = speechInputMap[key]
     if (oldReader != null)
         return BufferedReader(oldReader)
-    val input = if (uri == null) microphoneInput() else bufferedAudioInput(uri.toURL().openStream())
+    val input = if (uri == null) microphoneInput(audioFormat) else bufferedAudioInput(uri.toURL().openStream())
     val reader = SpeechReader(input)
     speechInputMap[key] = reader
     reader.start()
@@ -71,6 +80,69 @@ class SpeechReader(val audioStream: AudioInputStream): Reader() {
 
     fun write(txt: String) {
         buffer.append(txt)
+    }
+}
+
+class SpeechWriter(private val voiceCommand: String, private val audioFormat: AudioFormat = defaultAudioFormat): Writer() {
+    private val bufferSize = 1024
+    private val buffer = ByteArray(bufferSize)
+    private var process: Process? = null
+    private val speakers = AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, audioFormat)) as SourceDataLine
+    init {
+        speakers.open(audioFormat)
+        speakers.start()
+    }
+
+    val inputStream: InputStream get() {
+        if (process == null)
+            process = Runtime.getRuntime().exec(voiceCommand.split(" ").toTypedArray())
+        return process!!.inputStream
+    }
+
+    val outputStream: OutputStream get() {
+        if (process == null)
+            process = startProcess()
+        return process!!.outputStream
+    }
+
+    val errorStream: InputStream get() {
+        if (process == null)
+            process = startProcess()
+        return process!!.errorStream
+    }
+
+    override fun close() {
+        flush()
+        speakers.drain()
+        speakers.close()
+        if (process != null) {
+            process!!.destroy()
+            process = null
+        }
+    }
+
+    override fun flush() {
+        speakers.flush()
+    }
+
+    override fun write(cbuf: CharArray, off: Int, len: Int) {
+        val bytes = String(if (off == 0 && len == cbuf.size) cbuf else CharArray(len) { cbuf[off+it] }).toByteArray(Charset.forName(defaultCharset()))
+        outputStream.write(bytes)
+        outputStream.flush()
+        outputStream.close()
+        var bytesRead = 0
+        do {
+            Thread.sleep(threadWaitTime)
+            bytesRead = inputStream.read(buffer)
+            if (bytesRead > 0)
+                speakers.write(buffer, 0, bytesRead)
+        } while (bytesRead > 0)
+    }
+
+    private fun startProcess(): Process {
+        return ProcessBuilder(*voiceCommand.split(" ").toTypedArray())
+            .redirectError(ProcessBuilder.Redirect.INHERIT)
+            .start()
     }
 }
 
@@ -247,6 +319,7 @@ class AudioStream {
 private const val threadWaitTime = 100L
 private const val sampleRate = 16000F
 private const val sendPartial = false
+private val defaultAudioFormat = AudioFormat(sampleRate, 16, 1, true, false)
 private val speechInputMap = mutableMapOf<String,SpeechReader>()
 private var voskModel: Model? = null
 private val audioFormats = arrayOf<List<String>>(
@@ -266,14 +339,6 @@ private fun speechProcessor(reader: SpeechReader): SpeechProcessor {
     }
 }
 
-private fun microphoneInput(): AudioInputStream {
-    val format = AudioFormat(sampleRate, 16, 1, true, false)
-    val targetLine = AudioSystem.getTargetDataLine(format)
-    targetLine.open(format)
-    targetLine.start()
-    return AudioInputStream(targetLine)
-}
-
 private fun bufferedAudioInput(input: InputStream): AudioInputStream {
     return if (input is AudioInputStream)
         input
@@ -286,10 +351,13 @@ private fun bufferedAudioInput(input: InputStream): AudioInputStream {
 private fun voskSpeechModel(reader: SpeechReader): Model {
     if (voskModel == null) {
         LibVosk.setLogLevel(LogLevel.WARNINGS)
-        val uri = reader.configuration.voskSpeechModel ?: throw RuntimeException("Vosk speech model is not configured")
+        val uri = reader.configuration.voskModelFolder ?: throw RuntimeException("Vosk speech model is not configured")
         if (uri.scheme != "file")
-            throw RuntimeException("Vosk speech model file must be a local file")
-        voskModel = Model(uri.path)
+            throw RuntimeException("Vosk speech model folder must be a local file: $uri")
+        val lang = getLanguage(getContext().configuration.language) ?: throw RuntimeException("Unsupported language")
+        if (lang.model.isNullOrBlank())
+            throw RuntimeException("Vosk speech model is not not define for this language: $lang")
+        voskModel = Model(uri.path+"/"+lang.model)
     }
     return voskModel!!
 }
