@@ -59,7 +59,7 @@ fun detectFileType(path: String?): String? {
     return getExtensionMimetype(parts[parts.size-1])
 }
 
-class NaLaQFormat(
+class GenericFormat(
     override val mimetype: String,
     override val extensions: List<String>,
     private val decoder: (InputStream, String) -> Any?,
@@ -117,7 +117,7 @@ private fun configureJsonMapper(mapper: ObjectMapper): ObjectMapper {
 
 private fun loadMimeTypesFile(): MutableMap<String,Format> {
     val mimetypes = initManagedMimetypes()
-    val reader = BufferedReader(InputStreamReader(NaLaQFormat::class.java.getResource("/mime.types").openStream()))
+    val reader = BufferedReader(InputStreamReader(GenericFormat::class.java.getResource("/mime.types").openStream()))
     reader.lines().forEach { line ->
         val escape = line.indexOf('#')
         val txt = if (escape >= 0) line.substring(0, escape) else line
@@ -149,7 +149,7 @@ private fun addMimetype(mimetypes: MutableMap<String,Format>,
                         encoder: (Any?, OutputStream, String) -> Unit,
                         mimetype: String, extensions: List<String>,
                         supported: Boolean = true) {
-    val format = NaLaQFormat(mimetype, extensions, decoder, encoder, supported)
+    val format = GenericFormat(mimetype, extensions, decoder, encoder, supported)
     mimetypes[mimetype] = format
     addExtensions(format)
 }
@@ -167,16 +167,16 @@ private fun initManagedMimetypes(): MutableMap<String,Format> {
     addMimetype(formats, ::decodeBytes, ::encodeBytes, "application/octet-stream", listOf("bin"))
     addMimetype(formats, ::decodeString, ::encodeTextPlain, "text/plain", listOf("txt"))
     addMimetype(formats, ::decodeProperties, ::encodeProperties, "text/x-java-properties", listOf("properties"))
-    addMimetype(formats, ::decodeCsv, ::encodeCsv,"text/csv", listOf("csv"))
-    addMimetype(formats, ::decodeUris, ::encodeUris,"text/uri-list", listOf("uris", "uri"))
-    addMimetype(formats, ::decodeNaLaQ, ::encodeNaLaQ,"text/x-nalaq", listOf("nalaq, nlq"))
-    addMimetype(formats, ::decodeJson, ::encodeJson,"application/json", listOf("json"))
-    addMimetype(formats, ::decodeYaml, ::encodeYaml,"application/yaml", listOf("yaml"))
-    addMimetype(formats, ::decodeHtml, ::encodeHtml,"text/html", listOf("html", "htm"))
-    addMimetype(formats, ::decodeXml, ::encodeXml,"application/xml", listOf("xml"))
-    addMimetype(formats, ::decodeForm, ::encodeForm,"application/x-www-form-urlencoded", listOf("form", "urlencoded"))
-    addMimetype(formats, ::decodeVcard, ::encodeVcard,"text/vcard", listOf("vcf", "vcard"))
-    addMimetype(formats, ::decodeCalendar, ::encodeCalendar,"text/calendar", listOf("ics", "ifb"))
+    addMimetype(formats, ::decodeCsv, ::encodeCsv, "text/csv", listOf("csv"))
+    addMimetype(formats, ::decodeUris, ::encodeUris, "text/uri-list", listOf("uris", "uri"))
+    addMimetype(formats, ::decodeNalaq, ::encodeNalaq, "text/x-nalaq", listOf("nalaq, nlq"))
+    addMimetype(formats, ::decodeJson, ::encodeJson, "application/json", listOf("json"))
+    addMimetype(formats, ::decodeYaml, ::encodeYaml, "application/yaml", listOf("yaml"))
+    addMimetype(formats, ::decodeHtml, ::encodeHtml, "text/html", listOf("html", "htm"))
+    addMimetype(formats, ::decodeXml, ::encodeXml, "application/xml", listOf("xml"))
+    addMimetype(formats, ::decodeForm, ::encodeForm, "application/x-www-form-urlencoded", listOf("form", "urlencoded"))
+    addMimetype(formats, ::decodeVcard, ::encodeVcard, "text/vcard", listOf("vcf", "vcard"))
+    addMimetype(formats, ::decodeCalendar, ::encodeCalendar, "text/calendar", listOf("ics", "ifb"))
 
     for (mimetype in ImageIO.getReaderMIMETypes()) {
         if (!mimetype.startsWith("x-")) {
@@ -293,11 +293,11 @@ private fun encodeProperties(value: Any?, output: OutputStream, charset: String?
     properties.store(OutputStreamWriter(output, charset), "")
 }
 
-private fun decodeNaLaQ(input: InputStream, charset: String): Any? {
+private fun decodeNalaq(input: InputStream, charset: String): Any? {
     return input.readAllBytes().toText().toExpression()
 }
 
-private fun encodeNaLaQ(value: Any?, output: OutputStream, charset: String) {
+private fun encodeNalaq(value: Any?, output: OutputStream, charset: String) {
     output.write((value.toText()+"\n").toByteArray(Charset.forName(charset)))
 }
 

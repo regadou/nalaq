@@ -52,9 +52,9 @@ fun getContext(vararg values: Any): Context {
         else if (value is Parser)
             parser = value
         else if (value is MutableMap<*,*>)
-            variables = NaLaQNamespace(readOnly = false).populate(value as MutableMap<String,Any?>)
+            variables = GenericNamespace(readOnly = false).populate(value as MutableMap<String,Any?>)
         else if (value is Map<*,*>)
-            constants = NaLaQNamespace(readOnly = true).populate((value as Map<String,Any?>).toMutableMap())
+            constants = GenericNamespace(readOnly = true).populate((value as Map<String,Any?>).toMutableMap())
         else if (value is String)
             name = value
         else if (value is URI)
@@ -62,12 +62,12 @@ fun getContext(vararg values: Any): Context {
     }
 
     if (constants == null && variables == null)
-        constants = defaultNamespace()
+        constants = getNamespace("nalaq")
     if (name == null)
         name = randomName()
     if (uri == null)
         uri = File(System.getProperty("user.dir")).toURI()
-    val cx = Context(name!!, uri!!.toString(), parent, parser, constants ?: NaLaQNamespace(readOnly=true), variables ?: NaLaQNamespace(), config)
+    val cx = Context(name!!, uri!!.toString(), parent, parser, constants ?: GenericNamespace(readOnly=true), variables ?: GenericNamespace(), config)
     CURRENT_CONTEXT.set(cx)
     return cx
 }
@@ -97,7 +97,7 @@ class Context(
     fun childContext(childName: String?, constants: Namespace, uri: String = this.uri): Context {
         if (CURRENT_CONTEXT.get() != this)
             throw RuntimeException("This context is not the current thread context")
-        val cx = Context(childName ?: name+"/"+randomName(), uri, this, null, constants, NaLaQNamespace(), null)
+        val cx = Context(childName ?: name+"/"+randomName(), uri, this, null, constants, GenericNamespace(), null)
         CURRENT_CONTEXT.set(parent)
         return cx
     }
@@ -185,8 +185,8 @@ class Context(
             p = p.parent
         }
         parser = when (configuration.textParser) {
-            TextParser.NALAQ -> NaLaQParser()
-            TextParser.NLP -> NlpParser(configuration.nlpModelFolder ?: throw RuntimeException("NLP model folder was not specified"))
+            TextParser.NALAQ -> GenericParser()
+            TextParser.NLP -> NlpParser(configuration.nlpModelsFolder ?: throw RuntimeException("NLP model folder was not specified"))
             TextParser.TRANSLATE -> TranslateParser()
         }
         return parser!!
@@ -239,32 +239,4 @@ private val FUNCTIONS_FILE = "com.magicreg.nalaq.FunctionsKt"
 
 private fun randomName(): String {
     return UUID.randomUUID().toString()
-}
-
-private fun defaultNamespace(): Namespace {
-    val ns: Namespace = NaLaQNamespace().populate(mapOf(
-        "all" to KotlinPropertyReference(Context::names, Context::class),
-        "true" to true,
-        "false" to false,
-        "null" to ValueReference(null, true)
-    ))
-    for (op in builtinOperators()) {
-        val lastIndex = op.name.lastIndexOf("_")
-        if (lastIndex < 0)
-            continue
-        val name = op.name.substring(0, lastIndex)
-        if (ns.hasName(name))
-            throw RuntimeException("Default namespace already has a registered name of $name")
-        ns.setValue(name, op)
-    }
-    registerTypeAndChildren(getTypeByClass(Any::class), ns)
-    return ns
-}
-
-private fun registerTypeAndChildren(type: Type, ns: Namespace) {
-    if (ns.hasName(type.name))
-        throw RuntimeException("Default namespace already has a registered name of ${type.name}")
-    ns.setValue(type.name, type)
-    for (child in type.childrenTypes)
-        registerTypeAndChildren(child, ns)
 }

@@ -20,7 +20,6 @@ import java.util.*
 import javax.sound.sampled.AudioInputStream
 import javax.sound.sampled.AudioSystem
 import kotlin.reflect.*
-import kotlin.reflect.full.isSuperclassOf
 import kotlin.reflect.jvm.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -483,7 +482,7 @@ fun toNamespace(value: Any?): Namespace {
         if (readOnly == null)
             readOnly = toBoolean(mapping.remove("readOnly"))
     }
-    return NaLaQNamespace(prefix?:"", uri?:"http://localhost/", readOnly?:false).populate(mapping?:mutableMapOf())
+    return GenericNamespace(prefix?:"", uri?:"http://localhost/", readOnly?:false).populate(mapping?:mutableMapOf())
 }
 
 fun toURI(value: Any?): URI {
@@ -621,9 +620,13 @@ fun toAudioStream(value: Any?): AudioStream {
     else if (value.isText()) {
         val speaker = getSpeechWriter()
         if (speaker != null)
-            audio.inputAudio(speaker.inputStream)
+            audio.inputAudio(speaker.audioInputStream(value.toText()))
     }
-    // TODO: else if (value is Collection || value::class.java.isArray)
+    else if (value is Collection<*> || value is Array<*>) {
+        val list = toCollection(value)
+        for (item in list)
+            audio.inputAudio(toAudioStream(item).audioInputStream())
+    }
     // TODO: else if (value is javax.sound.midi.Sequence)
     else {
         val uri = value.toUri()
@@ -637,13 +640,13 @@ fun toSpeechReader(value: Any?): SpeechReader {
     if (value is SpeechReader)
         return value
     if (value is AudioInputStream)
-        return SpeechReader(value)
+        return SpeechReader(getContext().configuration.language, value)
     if (value is InputStream)
-        return SpeechReader(AudioSystem.getAudioInputStream(value))
+        return SpeechReader(getContext().configuration.language, AudioSystem.getAudioInputStream(value))
     if (value is AudioStream)
-        return SpeechReader(value.audioInputStream())
+        return SpeechReader(getContext().configuration.language, value.audioInputStream())
     // TODO: a collection or array that specifies both the source(stream|uri and the model)
-    return SpeechReader(toAudioStream(value).audioInputStream())
+    return SpeechReader(getContext().configuration.language, toAudioStream(value).audioInputStream())
 }
 
 fun toClass(value: Any?): KClass<*> {
@@ -740,7 +743,7 @@ fun toProperty(value: Any?): Property {
         return KotlinProperty(value.kotlinProperty as KProperty<Any?>)
     if (value is Map.Entry<*,*>) {
         val type = getTypeByClass(if (value == null) Void::class else value::class)
-        return NaLaQProperty(value.key.toString(), type)
+        return GenericProperty(value.key.toString(), type)
     }
     if (value is CharSequence) {
         val parser = StringTokenizer(value.toString())
@@ -765,7 +768,7 @@ fun toProperty(value: Any?): Property {
             }
         }
         if (name != null && type != null)
-            return NaLaQProperty(name = name, type = type, options = options)
+            return GenericProperty(name = name, type = type, options = options)
     }
     return getTypeByClass(if (value == null) Void::class else value::class).property("", value)
 }

@@ -31,7 +31,6 @@ dependencies {
     implementation("io.ktor:ktor-server-sessions-jvm")
     implementation("commons-beanutils:commons-beanutils:1.9.4")
     implementation("com.alphacephei:vosk:0.3.45")
-    implementation("ai.picovoice:cheetah-java:2.0.1")
     implementation("org.apache.opennlp:opennlp-tools:2.3.3")
     implementation("com.fasterxml.jackson.core:jackson-annotations:2.12.3")
     implementation("com.fasterxml.jackson.core:jackson-core:2.12.3")

@@ -61,6 +61,7 @@ private const val StatusCode_GatewayTimeout = 504
 private const val DEBUG = true
 private const val DEFAULT_MIMETYPE = "text/html"
 private const val JSON_MIMETYPE = "application/json"
+private const val DICTIO_WORD = "dictionary"
 private val INDEX_TYPES = arrayOf("html", "htm", "json", "txt", "kts", "nalaq", "nlq")
 private val METHODS_WITH_BODY = arrayOf("POST", "PUT")
 private val INTERNAL_SERVER_ERROR = HttpStatusCode(StatusCode_InternalServerError, "Internal Server Error")
@@ -120,17 +121,12 @@ private fun httpRequest(cx: Context, request: HttpRequest): ResponseData {
 private fun getRequest(cx: Context, request: HttpRequest): ResponseData {
     val baseuri = cx.configuration.staticFolder ?: "."
     if (request.path == "/") {
-        val links = if (cx.configuration.webContextName.isNullOrBlank())
-            File(baseuri).list().toList()
-        else {
-            val list = mutableListOf(cx.configuration.webContextName)
-            list.addAll(File(baseuri).list().toList())
-            list
-        }
+        val links = mutableListOf(DICTIO_WORD)
+        links.addAll(File(baseuri).list().toList())
         return printLinks(links, "/", baseuri, request.query)
     }
     val path = getPathParts(request.path)
-    if (path[0] == cx.configuration.webContextName)
+    if (path[0] == DICTIO_WORD)
         return getContextValue(cx, path, request.query)
     return getFileContent(cx, request.path, baseuri, request.query)
 }
@@ -167,7 +163,7 @@ private fun postRequest(cx: Context, request: HttpRequest): ResponseData {
     if (request.path == "/")
         return ResponseData(StatusCode_MethodNotAllowed, DEFAULT_MIMETYPE)
     val path = getPathParts(request.path)
-    if (path[0] == cx.configuration.webContextName)
+    if (path[0] == DICTIO_WORD)
         return postContextValue(cx, path, request)
     return postFileContent(cx, request.path, cx.configuration.staticFolder ?: ".", request)
 }
@@ -213,7 +209,7 @@ private fun putRequest(cx: Context, request: HttpRequest): ResponseData {
     if (request.path == "/")
         return ResponseData(StatusCode_MethodNotAllowed, DEFAULT_MIMETYPE)
     val path = getPathParts(request.path)
-    if (path[0] == cx.configuration.webContextName)
+    if (path[0] == DICTIO_WORD)
         return putContextValue(cx, path, request)
     return putFileContent(cx, request.path, cx.configuration.staticFolder ?: ".", request)
 }
@@ -242,7 +238,7 @@ private fun putContextValue(cx: Context, path: List<String>, request: HttpReques
 private fun deleteRequest(cx: Context, request: HttpRequest): ResponseData {
     if (request.path == "/")
         return ResponseData(StatusCode_MethodNotAllowed, DEFAULT_MIMETYPE)
-    if (getPathParts(request.path)[0] == cx.configuration.webContextName)
+    if (getPathParts(request.path)[0] == DICTIO_WORD)
         return ResponseData(StatusCode_MethodNotAllowed, DEFAULT_MIMETYPE)
     val filename = request.path
     val baseuri = cx.configuration.staticFolder ?: "."

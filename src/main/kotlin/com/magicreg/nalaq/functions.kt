@@ -320,7 +320,7 @@ fun done_func(args: List<Any?>): Any? {
     throw RuntimeException("Function done is not supposed to be called")
 }
 
-class NaLaQFunction(
+class GenericFunction(
     override val name: String,
     val parameterNames: List<String>,
     val expressions: List<Expression>
@@ -355,12 +355,12 @@ class NaLaQFunction(
         get() = null
 
     override fun call(vararg args: Any?): Any? {
-        val params = NaLaQNamespace(readOnly=true).populate(args.indices.associate { Pair(parameterNames[it], args[it]) })
+        val params = GenericNamespace(readOnly=true).populate(args.indices.associate { Pair(parameterNames[it], args[it]) })
         return executeExpressions(params, expressions)
     }
 
     override fun callBy(args: Map<KParameter, Any?>): Any? {
-        val params = NaLaQNamespace(readOnly=true).populate(args.mapKeys{it.key.name!!})
+        val params = GenericNamespace(readOnly=true).populate(args.mapKeys{it.key.name!!})
         return executeExpressions(params, expressions)
     }
 
@@ -374,7 +374,7 @@ class NaLaQFunction(
     }
 }
 
-data class NaLaQParameter(
+data class FunctionParameter(
     override val annotations: List<Annotation>,
     override val index: Int,
     override val isOptional: Boolean,

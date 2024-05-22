@@ -12,12 +12,11 @@ fi
 config="---
 expressionPrompt:
 outputFormat: text/plain
-language: $slang
-targetLanguage: $tlang
+textParser: translate
+speechModelsFolder: $models
 translateEndpoint: http://localhost:5000/translate
 voiceCommand: glowspeak
-textParser: translate
-speechEngine: vosk
-voskModelFolder: $models
+language: $slang
+targetLanguage: $tlang
 "
 nalaq config "$config"

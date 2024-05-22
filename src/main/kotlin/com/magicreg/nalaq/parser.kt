@@ -14,7 +14,7 @@ fun compileTokens(vararg tokens: Any?): Expression {
     return compileExpressions(ParserStatus(tokens.toList() as List<List<Any?>>), true)
 }
 
-class NaLaQParser(): Parser {
+class GenericParser(): Parser {
     override fun parse(txt: String): Expression {
         val tokens = parseText(txt)
         if (tokens.isEmpty())
@@ -87,14 +87,16 @@ private fun parseText(txt: String): List<Any?> {
 
 private fun getTokenValue(txt: String): Any? {
     val cx = getContext()
-    if (cx.isConstant(txt))
-        return cx.value(txt)
-    var value = txt.toLongOrNull()
-             ?: txt.toDoubleOrNull()
-             ?: txt.toTemporal()
-             ?: txt.toUri()
-             ?: txt.toJvm()
-             ?: NameReference(txt)
+    val value = if (cx.isConstant(txt))
+        cx.value(txt)
+    else {
+        txt.toLongOrNull()
+        ?: txt.toDoubleOrNull()
+        ?: txt.toTemporal()
+        ?: txt.toUri()
+        ?: txt.toJvm()
+        ?: NameReference(txt)
+    }
     return if (value is URI && value.readOnly()) value.resolve() else value
 }
 

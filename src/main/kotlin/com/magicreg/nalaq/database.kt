@@ -60,7 +60,7 @@ class Database(
         val rs = meta.getColumns(null,null,table.uppercase(),null)
         while (rs.next()) {
             val name = rs.getString("COLUMN_NAME").lowercase()
-            columns[name] = getNaLaQType(rs.getObject("DATA_TYPE"), name).name
+            columns[name] = getNalaqType(rs.getObject("DATA_TYPE"), name).name
         }
         rs.close();
         return columns;
@@ -203,7 +203,7 @@ class Database(
         }
     }
 
-    private fun getNaLaQType(sqlType: Any?, columnName: String): Type {
+    private fun getNalaqType(sqlType: Any?, columnName: String): Type {
         if (sqlType == null)
             return ANY
         return when (sqlType.toString().toInt()) {

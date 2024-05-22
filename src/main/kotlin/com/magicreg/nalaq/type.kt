@@ -92,7 +92,7 @@ fun getTypeFromData(data: Collection<*>, name: String? = null): Type {
 
     val constructor: KFunction<Any?>? = null // TODO: construct a map with properties from any value
     val validator: ((Any?) -> Boolean)? = null // TODO: validate if map or bean map has required properties with proper value type
-    val type = NaLaQType(name ?: UUID.randomUUID().toString(), getTypeByClass(Map::class), emptyList(), properties, constructor, validator)
+    val type = GenericType(name ?: UUID.randomUUID().toString(), getTypeByClass(Map::class), emptyList(), properties, constructor, validator)
     if (name != null) {
         if (NAME_TYPE_MAP.containsKey(name))
             throw RuntimeException("Type name already registered: $name")
@@ -105,7 +105,7 @@ fun getTypeFromData(data: Collection<*>, name: String? = null): Type {
 fun anyType(): Type { return ANY_TYPE }
 fun nullProperty(): Property { return NULL_PROPERTY }
 
-class NaLaQType(
+class GenericType(
     override val name: String,
     override val parentType: Type,
     override val classes: List<KClass<*>> = listOf(),
@@ -120,9 +120,9 @@ class NaLaQType(
         return type
     }
     override val childrenTypes: List<Type> get() = subTypes.toList()
-    private val subTypes = mutableSetOf<NaLaQType>()
+    private val subTypes = mutableSetOf<GenericType>()
     init {
-        if (parentType is NaLaQType)
+        if (parentType is GenericType)
             parentType.subTypes.add(this)
         else if (parentType is AnyType)
             parentType.subTypes.add(this)
@@ -199,7 +199,7 @@ class NaLaQType(
     }
 }
 
-class NaLaQProperty(
+class GenericProperty(
     override val name: String,
     override val type: Type,
     private val reader: ((Any?) -> Any?)? = null,
@@ -299,28 +299,28 @@ private class AnyType(): Type {
     override fun isInstance(value: Any?): Boolean {
         return true
     }
-    val subTypes = mutableSetOf<NaLaQType>()
+    val subTypes = mutableSetOf<GenericType>()
 }
 
 private val ANY_TYPE = AnyType()
-private val NULL_PROPERTY: Property = NaLaQProperty("null", ANY_TYPE)
+private val NULL_PROPERTY: Property = GenericProperty("null", ANY_TYPE)
 private val CLASS_TYPE_MAP = mutableMapOf<KClass<*>, Type>(
-    Void::class to NaLaQType("nothing", ANY_TYPE, listOf(Void::class), null, ::nullFunction) { it == null },
-    Number::class to NaLaQType("number", ANY_TYPE, listOf(Number::class), null, ::toNumber),
-    KFunction::class to NaLaQType("function", ANY_TYPE, listOf(KFunction::class, Method::class, Constructor::class), null, ::toFunction),
-    Map::class to NaLaQType("entity", ANY_TYPE, listOf(Map::class), null, ::toEntity),
-    Collection::class to NaLaQType("collection", ANY_TYPE, listOf(Collection::class), null, ::toList) { it is Collection<*> || (it != null && it::class.java.isArray) },
-    CharSequence::class to NaLaQType("text", ANY_TYPE, listOf(CharSequence::class, CharArray::class, Char::class), null, ::toConcatString),
-    View::class to NaLaQType("view", ANY_TYPE, listOf(View::class), null, ::toView),
+    Void::class to GenericType("nothing", ANY_TYPE, listOf(Void::class), null, ::nullFunction) { it == null },
+    Number::class to GenericType("number", ANY_TYPE, listOf(Number::class), null, ::toNumber),
+    KFunction::class to GenericType("function", ANY_TYPE, listOf(KFunction::class, Method::class, Constructor::class), null, ::toFunction),
+    Map::class to GenericType("entity", ANY_TYPE, listOf(Map::class), null, ::toEntity),
+    Collection::class to GenericType("collection", ANY_TYPE, listOf(Collection::class), null, ::toList) { it is Collection<*> || (it != null && it::class.java.isArray) },
+    CharSequence::class to GenericType("text", ANY_TYPE, listOf(CharSequence::class, CharArray::class, Char::class), null, ::toConcatString),
+    View::class to GenericType("view", ANY_TYPE, listOf(View::class), null, ::toView),
     Any::class to ANY_TYPE
 )
 private val NAME_TYPE_MAP = indexAllBuiltinTypes()
 private val GENERIC_PROPERTIES = mapOf(
-    "" to NaLaQProperty("", ANY_TYPE, {it}),
-    "type" to NaLaQProperty("type", CLASS_TYPE_MAP[Type::class]!!, {getTypeByClass(if (it == null) Void::class else it::class)}),
-    "class" to NaLaQProperty("class", CLASS_TYPE_MAP[KClass::class]!!, {if (it == null) Void::class else it::class}),
-    "size" to NaLaQProperty("size", CLASS_TYPE_MAP[Int::class]!!, ::sizePropertyValue),
-    "keys" to NaLaQProperty("keys", CLASS_TYPE_MAP[Int::class]!!, ::keysPropertyValue)
+    "" to GenericProperty("", ANY_TYPE, {it}),
+    "type" to GenericProperty("type", CLASS_TYPE_MAP[Type::class]!!, {getTypeByClass(if (it == null) Void::class else it::class)}),
+    "class" to GenericProperty("class", CLASS_TYPE_MAP[KClass::class]!!, {if (it == null) Void::class else it::class}),
+    "size" to GenericProperty("size", CLASS_TYPE_MAP[Int::class]!!, ::sizePropertyValue),
+    "keys" to GenericProperty("keys", CLASS_TYPE_MAP[Int::class]!!, ::keysPropertyValue)
 )
 
 private fun indexAllBuiltinTypes(): MutableMap<String, Type> {
@@ -384,7 +384,7 @@ private fun addType(name: String, parent: KClass<*>, classes: List<KClass<*>>, c
         if (CLASS_TYPE_MAP.containsKey(klass))
             throw RuntimeException("Duplicate $klass for new type $name")
     }
-    CLASS_TYPE_MAP[classes[0]] = NaLaQType(name, getTypeByClass(parent), classes, null, constructor)
+    CLASS_TYPE_MAP[classes[0]] = GenericType(name, getTypeByClass(parent), classes, null, constructor)
 }
 
 private fun simplify(args: List<Any?>): Any? {
@@ -434,7 +434,7 @@ private fun arrayTypes(): List<KClass<*>> {
 
 private fun indexProperty(name: String): Property? {
     val index = name.toIntOrNull() ?: return null
-    return NaLaQProperty(name, ANY_TYPE, {indexPropertyValue(index, it)}, { instance, value -> indexPropertySetValue(index, instance, value)})
+    return GenericProperty(name, ANY_TYPE, {indexPropertyValue(index, it)}, { instance, value -> indexPropertySetValue(index, instance, value)})
 }
 
 private fun indexPropertyValue(index: Int, instance: Any?): Any? {
@@ -499,7 +499,7 @@ private fun indexPropertySetValue(index: Int, instance: Any?, value: Any?): Bool
 }
 
 private fun mapProperty(name: String, instance: Map<*,*>): Property? {
-    return if (instance.contains(name)) NaLaQProperty(name, ANY_TYPE, {mapPropertyValue(name, it)}, { instance, value -> mapPropertySetValue(name, instance, value)}) else null
+    return if (instance.contains(name)) GenericProperty(name, ANY_TYPE, {mapPropertyValue(name, it)}, { instance, value -> mapPropertySetValue(name, instance, value)}) else null
 }
 
 private fun mapPropertyValue(name: String, instance: Any?): Any? {
@@ -553,7 +553,7 @@ private fun mapProperties(map: Map<*,*>): Map<String,Property> {
         val name = key.toString()
         val value = map[key]
         val type = if (value == null) ANY_TYPE else getTypeByClass(value::class)
-        properties[name] = NaLaQProperty(name, type)
+        properties[name] = GenericProperty(name, type)
     }
     return properties
 }

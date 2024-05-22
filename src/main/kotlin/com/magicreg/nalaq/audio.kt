@@ -1,46 +1,43 @@
 package com.magicreg.nalaq
 
-import ai.picovoice.cheetah.Cheetah
 import org.vosk.LibVosk
 import org.vosk.LogLevel
 import org.vosk.Model
 import org.vosk.Recognizer
 import java.io.*
 import java.net.URI
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.sound.sampled.*
 
 fun microphoneInput(audioFormat: AudioFormat = defaultAudioFormat): AudioInputStream {
-    val format = audioFormat
-    val targetLine = AudioSystem.getTargetDataLine(format)
-    targetLine.open(format)
+    val targetLine = AudioSystem.getTargetDataLine(audioFormat)
+    targetLine.open(audioFormat)
     targetLine.start()
     return AudioInputStream(targetLine)
 }
 
-fun speechInputStream(uri: URI?, audioFormat: AudioFormat = defaultAudioFormat): BufferedReader {
-    val key = uri?.toString() ?: ""
+fun speechInputStream(language: String, uri: URI? = null, audioFormat: AudioFormat = defaultAudioFormat): BufferedReader {
+    val key = "$language-$uri"
     val oldReader = speechInputMap[key]
     if (oldReader != null)
         return BufferedReader(oldReader)
     val input = if (uri == null) microphoneInput(audioFormat) else bufferedAudioInput(uri.toURL().openStream())
-    val reader = SpeechReader(input)
+    val reader = SpeechReader(language, input)
     speechInputMap[key] = reader
     reader.start()
     return BufferedReader(reader)
 }
 
-fun stopSpeechInput(uri: URI?): Boolean {
-    val old = speechInputMap.remove(uri?.toString() ?: "") ?: return false
+fun stopSpeechInput(language: String, uri: URI? = null): Boolean {
+    val key = "$language-$uri"
+    val old = speechInputMap.remove(key) ?: return false
     old.close()
     return true
 }
 
-class SpeechReader(val audioStream: AudioInputStream): Reader() {
-    val configuration = getContext().configuration
+class SpeechReader(val language: String, val audioStream: AudioInputStream): Reader() {
+    val speechModelsFolder = getContext().configuration.speechModelsFolder
     private val buffer = StringBuilder()
     private val processor = speechProcessor(this)
     private var closed = false
@@ -53,10 +50,8 @@ class SpeechReader(val audioStream: AudioInputStream): Reader() {
         if (buffer.isEmpty()) {
             if (processor.wasStopped() || closed)
                 return -1
-            if (!processor.isRunning()) {
+            if (!processor.isRunning())
                 start()
-                Thread.sleep(threadWaitTime)
-            }
         }
         if (len <= 0)
             return 0
@@ -83,66 +78,59 @@ class SpeechReader(val audioStream: AudioInputStream): Reader() {
     }
 }
 
-class SpeechWriter(private val voiceCommand: String, private val audioFormat: AudioFormat = defaultAudioFormat): Writer() {
+class SpeechWriter(language: String, voiceCommandTemplate: String): Writer() {
+    private val voiceCommand = createVoiceCommand(language, voiceCommandTemplate)
     private val bufferSize = 1024
     private val buffer = ByteArray(bufferSize)
     private var process: Process? = null
-    private val speakers = AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, audioFormat)) as SourceDataLine
-    init {
-        speakers.open(audioFormat)
-        speakers.start()
-    }
-
-    val inputStream: InputStream get() {
-        if (process == null)
-            process = Runtime.getRuntime().exec(voiceCommand.split(" ").toTypedArray())
-        return process!!.inputStream
-    }
-
-    val outputStream: OutputStream get() {
-        if (process == null)
-            process = startProcess()
-        return process!!.outputStream
-    }
-
-    val errorStream: InputStream get() {
-        if (process == null)
-            process = startProcess()
-        return process!!.errorStream
-    }
 
     override fun close() {
-        flush()
-        speakers.drain()
-        speakers.close()
         if (process != null) {
             process!!.destroy()
             process = null
         }
     }
 
-    override fun flush() {
-        speakers.flush()
-    }
+    override fun flush() {}
 
     override fun write(cbuf: CharArray, off: Int, len: Int) {
-        val bytes = String(if (off == 0 && len == cbuf.size) cbuf else CharArray(len) { cbuf[off+it] }).toByteArray(Charset.forName(defaultCharset()))
-        outputStream.write(bytes)
-        outputStream.flush()
-        outputStream.close()
+        val text = String(if (off == 0 && len == cbuf.size) cbuf else CharArray(len) { cbuf[off+it] })
+        val input = audioInputStream(text)
+        val speakers = AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, input.format)) as SourceDataLine
+        speakers.open(input.format)
+        speakers.start()
         var bytesRead = 0
         do {
-            Thread.sleep(threadWaitTime)
-            bytesRead = inputStream.read(buffer)
+            bytesRead = input.read(buffer)
             if (bytesRead > 0)
                 speakers.write(buffer, 0, bytesRead)
         } while (bytesRead > 0)
+        speakers.drain()
+        speakers.close()
+    }
+
+    fun audioInputStream(text: String): AudioInputStream {
+        close()
+        process = startProcess()
+        process!!.outputStream.write(text.toByteArray(Charset.forName(defaultCharset())))
+        process!!.outputStream.flush()
+        process!!.outputStream.close()
+        return AudioSystem.getAudioInputStream(process!!.inputStream)
     }
 
     private fun startProcess(): Process {
-        return ProcessBuilder(*voiceCommand.split(" ").toTypedArray())
+        return ProcessBuilder(*voiceCommand)
             .redirectError(ProcessBuilder.Redirect.INHERIT)
             .start()
+    }
+
+    private fun createVoiceCommand(language: String, voiceCommandTemplate: String): Array<String> {
+        val langObject = getLanguage(language)
+        if (langObject == null || langObject.voice.isNullOrBlank())
+            throw RuntimeException("Invalid speech language: $language")
+        val index = voiceCommandTemplate.indexOf(voiceTemplateVariable)
+        val command = if (index < 0) "$voiceCommandTemplate ${langObject.voice}" else voiceCommandTemplate.replace(voiceTemplateVariable, langObject.voice)
+        return command.split(" ").toTypedArray()
     }
 }
 
@@ -192,7 +180,6 @@ class VoskSpeechProcessor(private val reader: SpeechReader): SpeechProcessor {
                     }
                     if (lastIsPartial)
                         reader.write(getText(recognizer.finalResult) + "\n")
-                    Thread.sleep(threadWaitTime)
                     running.set(false)
                     stopped.set(true)
                 }
@@ -202,64 +189,6 @@ class VoskSpeechProcessor(private val reader: SpeechReader): SpeechProcessor {
 
     private fun getText(json: String): String {
         return json.split('"')[3]
-    }
-}
-
-class PicoVoiceSpeechProcessor(private val reader: SpeechReader): SpeechProcessor {
-    private val running = AtomicBoolean(false)
-    private val stopped = AtomicBoolean(false)
-
-    override fun isRunning(): Boolean {
-        return running.get()
-    }
-
-    override fun wasStopped(): Boolean {
-        return stopped.get()
-    }
-
-    override fun stopRunning() {
-        running.set(false)
-    }
-
-    override fun start() {
-        if (!stopped.get()) {
-            running.set(true)
-            Thread(this).start()
-        }
-    }
-
-    override fun run() {
-        if (!running.get())
-            return
-        reader.audioStream.use { input ->
-            val cheetah = Cheetah.Builder()
-                .setAccessKey(reader.configuration.picoAccessKey)
-                .setLibraryPath(Cheetah.LIBRARY_PATH)
-                .setModelPath(Cheetah.MODEL_PATH)
-                .setEndpointDuration(2f) // seconds
-                .setEnableAutomaticPunctuation(false)
-                .build()
-            val frameLength = cheetah.frameLength;
-            val captureBuffer = ByteBuffer.allocate(frameLength * 2);
-            captureBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            val cheetahBuffer = ShortArray(frameLength)
-            var numBytesRead = 0
-            while (running.get() && input.read(captureBuffer.array()).also { numBytesRead = it } >= 0) {
-                if (numBytesRead != frameLength * 2)
-                    continue
-                captureBuffer.asShortBuffer().get(cheetahBuffer)
-                val transcriptObj = cheetah.process(cheetahBuffer);
-                reader.write(transcriptObj.transcript.lowercase())
-                if (transcriptObj.isEndpoint) {
-                    val finalTranscriptObj = cheetah.flush();
-                    reader.write(finalTranscriptObj.transcript.lowercase() + "\n")
-                }
-            }
-            cheetah.delete()
-            Thread.sleep(threadWaitTime)
-            running.set(false)
-            stopped.set(true)
-        }
     }
 }
 
@@ -304,7 +233,7 @@ class AudioStream {
         val output = ByteArrayOutputStream()
         val bufferSize = format.sampleRate * format.frameSize
         audio.copyTo(output, bufferSize.toInt())
-        bytes = output.toByteArray()
+        bytes = output.toByteArray() // TODO: bytes should be added, not replaced
         return bytes.size
     }
 
@@ -316,12 +245,12 @@ class AudioStream {
     }
 }
 
-private const val threadWaitTime = 100L
 private const val sampleRate = 16000F
 private const val sendPartial = false
+private const val voiceTemplateVariable = "{voice}"
 private val defaultAudioFormat = AudioFormat(sampleRate, 16, 1, true, false)
 private val speechInputMap = mutableMapOf<String,SpeechReader>()
-private var voskModel: Model? = null
+private var voskModelMap = mutableMapOf<String,Model>()
 private val audioFormats = arrayOf<List<String>>(
     "audio/x-aiff,aif,aiff,aifc".split(","),
     "audio/basic,au,snd".split(","),
@@ -332,11 +261,7 @@ private val audioFormats = arrayOf<List<String>>(
 private val audioFormatsMap = initAudioFormats()
 
 private fun speechProcessor(reader: SpeechReader): SpeechProcessor {
-    return when (val selectedEngine = reader.configuration.speechEngine) {
-        SpeechEngine.VOSK -> VoskSpeechProcessor(reader)
-        SpeechEngine.PICO -> PicoVoiceSpeechProcessor(reader)
-        else -> throw RuntimeException("Unknown speech engine: $selectedEngine")
-    }
+    return VoskSpeechProcessor(reader)
 }
 
 private fun bufferedAudioInput(input: InputStream): AudioInputStream {
@@ -349,17 +274,21 @@ private fun bufferedAudioInput(input: InputStream): AudioInputStream {
 }
 
 private fun voskSpeechModel(reader: SpeechReader): Model {
-    if (voskModel == null) {
-        LibVosk.setLogLevel(LogLevel.WARNINGS)
-        val uri = reader.configuration.voskModelFolder ?: throw RuntimeException("Vosk speech model is not configured")
-        if (uri.scheme != "file")
-            throw RuntimeException("Vosk speech model folder must be a local file: $uri")
-        val lang = getLanguage(getContext().configuration.language) ?: throw RuntimeException("Unsupported language")
-        if (lang.model.isNullOrBlank())
-            throw RuntimeException("Vosk speech model is not not define for this language: $lang")
-        voskModel = Model(uri.path+"/"+lang.model)
+    if (voskModelMap.containsKey(reader.language))
+        return voskModelMap[reader.language]!!
+    LibVosk.setLogLevel(LogLevel.WARNINGS)
+    val modelsFolder = reader.speechModelsFolder ?: throw RuntimeException("Vosk speech model is not configured")
+    val file = File(modelsFolder).canonicalFile
+    if (!file.isDirectory) {
+        val state = if (file.exists()) "is not a directory" else "does not exist"
+        throw RuntimeException("Speech model folder $state: $file")
     }
-    return voskModel!!
+    val lang = getLanguage(reader.language) ?: throw RuntimeException("Unsupported language")
+    if (lang.model.isNullOrBlank())
+        throw RuntimeException("Vosk speech model is not not define for this language: $lang")
+    val model = Model("$file/${lang.model}")
+    voskModelMap[reader.language] = model
+    return model
 }
 
 private fun initAudioFormats(): Map<String,List<String>> {

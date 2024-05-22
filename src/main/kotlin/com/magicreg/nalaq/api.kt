@@ -36,7 +36,6 @@ enum class CompareOperator(val symbol: String, val function: KFunction<Any?>) {
     MATCH("~", ::match_func), NOT_MATCH("!~", ::not_match_func)
 }
 enum class LogicOperator { OR, AND }
-enum class SpeechEngine { VOSK, PICO }
 enum class TextParser { NALAQ, NLP, TRANSLATE }
 enum class UriMethod { GET, POST, PUT, DELETE }
 
@@ -46,18 +45,15 @@ data class Configuration(
     val expressionPrompt: String? = null,
     val printConfig: Boolean = false,
     val outputFormat: String? = null,
-    val exitWords: List<String> = emptyList(),
     val language: String = Locale.getDefault().language,
     val targetLanguage: String? = null,
     val translateEndpoint: URI? = null,
     val voiceCommand: String? = null,
     val textParser: TextParser = TextParser.entries[0],
-    val nlpModelFolder: String? = null,
-    val speechEngine: SpeechEngine? = null,
-    val voskModelFolder: URI? = null,
+    val nlpModelsFolder: String? = null,
+    val speechModelsFolder: String? = null,
     val picoAccessKey: String? = null,
     val serverPort: Int? = null,
-    val webContextName: String? = null,
     val namespaces: Map<String,URI> = emptyMap(),
     val staticFolder: String = System.getProperty("user.dir"),
     val startMethod: String? = null,
@@ -603,7 +599,7 @@ fun Any?.toFunction(): KFunction<Any?>? {
     }
     // TODO: can we detect functional interface and convert it to a KFunction ?
     // TODO: if (value is Type or KClass or Class) return the constructor of this type
-    // TODO: if (value is Collection or Array) use as parameters to construct a NaLaQFunction
+    // TODO: if (value is Collection or Array) use as parameters to construct a GenericFunction
     return null
 }
 

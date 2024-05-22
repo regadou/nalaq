@@ -21,7 +21,7 @@ fun loadNamespace(prefix: String, uri: URI, readOnly: Boolean): Namespace {
     return ns
 }
 
-class NaLaQNamespace (
+class GenericNamespace (
     override val prefix: String = "_",
     override val uri: String = "http://localhost/",
     override val readOnly: Boolean = false
@@ -59,7 +59,7 @@ class NaLaQNamespace (
     // TODO: functions value(path: List<String>) and setValue(path: List<String>)
 }
 
-// TODO: ArchiveNamespace class that can interface zip, tgz and file folder
+// TODO: ArchiveNamespace class that can interface zip, tgz, file folder and http index
 
 private val NS_PREFIX_MAP = mutableMapOf<String,Namespace>()
 private val NS_URI_MAP = mutableMapOf<String,Namespace>()

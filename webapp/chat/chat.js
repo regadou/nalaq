@@ -71,7 +71,7 @@ async function sendText(inputId, outputId, lineId) {
     const input = document.querySelector("#"+inputId)
     const chatlog = document.querySelector("#"+outputId)
     const text = input.value
-    const response = await fetch("/all/expression", {
+    const response = await fetch("/dictionary/expression", {
         method: 'POST',
         headers: {'Content-Type': 'text/plain'},
         body: text

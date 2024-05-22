@@ -19,6 +19,8 @@ fun main(args: Array<String>) {
 
 fun runConfiguration(config: Configuration) {
     validateLanguages(config)
+    if (!addNamespace(nalaqNamespace(config)))
+        throw RuntimeException("Nalaq namespace was registered before runtime")
     getContext(config)
     setOutputFormat(config.outputFormat ?: "application/json")
     if (config.printConfig)
@@ -67,18 +69,15 @@ fun loadConfiguration(args: Array<String>): Configuration? {
         expressionPrompt = if (configData.containsKey("expressionPrompt")) configData["expressionPrompt"]?.toString() else defaultExpressionPrompt,
         printConfig = toBoolean(configData["printConfig"]),
         outputFormat = configData["outputFormat"]?.toString(),
-        exitWords = getListValues(configData["exitWords"], defaultExitWords),
         language = configData["language"]?.toString() ?: Locale.getDefault().language,
         targetLanguage = configData["targetLanguage"]?.toString(),
         translateEndpoint = configData["translateEndpoint"]?.toUri(),
         voiceCommand = configData["voiceCommand"]?.toString(),
         textParser = selectedEnum(TextParser::values, configData["textParser"]) ?: TextParser.entries[0],
-        nlpModelFolder = configData["nlpModelFolder"]?.toString(),
-        speechEngine = selectedEnum(SpeechEngine::values, configData["speechEngine"]),
-        voskModelFolder = configData["voskModelFolder"]?.toUri(),
+        nlpModelsFolder = configData["nlpModelsFolder"]?.toString(),
+        speechModelsFolder = configData["speechModelsFolder"]?.toString(),
         picoAccessKey = configData["picoAccessKey"]?.toString(),
         serverPort = configData["serverPort"]?.toString()?.toIntOrNull(),
-        webContextName = if (configData.containsKey("webContextName")) configData["webContextName"]?.toString() else defaultWebContextName,
         namespaces = getMapUris(configData["namespaces"], ::loadNamespace),
         staticFolder = configData["staticFolder"]?.toString() ?: defaultStaticFolder,
         startMethod =  configData["startMethod"]?.toString() ?: start,
@@ -96,18 +95,15 @@ fun defaultConfiguration(expression: String? = null, debug: Boolean = false): Co
         expressionPrompt = if (debug) defaultExpressionPrompt else null,
         printConfig = debug,
         outputFormat = null,
-        exitWords = defaultExitWords,
         language = Locale.getDefault().language,
         targetLanguage = null,
         translateEndpoint = null,
         voiceCommand = null,
         textParser = TextParser.entries[0],
-        nlpModelFolder = null,
-        speechEngine = null,
-        voskModelFolder = null,
+        nlpModelsFolder = null,
+        speechModelsFolder = null,
         picoAccessKey = null,
         serverPort = port,
-        webContextName = defaultWebContextName,
         namespaces = emptyMap(),
         staticFolder = defaultStaticFolder,
         startMethod = if (exp != null) "expression" else if (port > 0) "server" else null,
@@ -130,16 +126,18 @@ fun getSpeechWriter(): SpeechWriter? {
 }
 
 private val configWords = "conf,config,configuration".split(",")
-private val defaultExitWords = "exit,quit".split(",")
 private val defaultStaticFolder = System.getProperty("user.dir")
-private const val voiceTemplateVariable = "{voice}"
+private const val helpWord = "help"
+private const val dictioWord = "dictionary"
+private const val exitWord = "exit"
 private const val startAudioWord = "audio"
 private const val stopAudioWord = "stop"
 private const val cancelAudioWord = "cancel"
 private const val defaultConsolePrompt = "\n? "
 private const val defaultResultPrompt = "= "
 private const val defaultExpressionPrompt = "-> "
-private const val defaultWebContextName = "all"
+private const val NALAQ_PREFIX = "nalaq"
+private const val NALAQ_URI = "https://magicreg.com/nalaq/"
 private var outputFormat: Format? = null
 private var defaultCharset = "utf8"
 private var speaker: SpeechWriter? = null
@@ -195,18 +193,11 @@ private fun validateLanguages(config: Configuration) {
             errors.add("Invalid target language: ${config.targetLanguage}")
     }
 
-    if (config.speechEngine == SpeechEngine.VOSK) {
-        if (config.voskModelFolder == null)
-            errors.add("Vosk models folder was not specified")
+    if (config.speechModelsFolder != null) {
         if (srclang == null)
             errors.add("Invalid language: ${config.language}")
         else if (srclang.model.isNullOrBlank())
             errors.add("No existing model for this language: ${config.language}")
-    }
-
-    if (config.speechEngine == SpeechEngine.PICO) {
-        if (config.picoAccessKey.isNullOrBlank())
-            errors.add("Pico access key was not specified")
     }
 
     if (config.voiceCommand != null) {
@@ -217,11 +208,8 @@ private fun validateLanguages(config: Configuration) {
         }
         else if (lang.voice.isNullOrBlank())
             errors.add("No existing voice for this language: ${config.language}")
-        else if (errors.isEmpty()) {
-            val index = config.voiceCommand.indexOf(voiceTemplateVariable)
-            val command = if (index < 0) "${config.voiceCommand} ${lang.voice}" else config.voiceCommand.replace(voiceTemplateVariable, lang.voice)
-            speaker = SpeechWriter(command)
-        }
+        else if (errors.isEmpty())
+            speaker = SpeechWriter(lang.code, config.voiceCommand)
     }
 
     if (errors.isNotEmpty()) {
@@ -229,6 +217,38 @@ private fun validateLanguages(config: Configuration) {
         val separator = if (errors.size > 1) "\n- " else " "
         throw RuntimeException("Configuration error$plural for language features:$separator${errors.joinToString(separator)}")
     }
+}
+
+private fun nalaqNamespace(config: Configuration): Namespace {
+    val ns: Namespace = GenericNamespace(
+        prefix = NALAQ_PREFIX,
+        uri = NALAQ_URI,
+        readOnly= true
+    ).populate(mapOf(
+        dictioWord to KotlinPropertyReference(Context::names, Context::class),
+        "true" to true,
+        "false" to false,
+        "null" to ValueReference(null, true)
+    ))
+    for (op in builtinOperators()) {
+        val lastIndex = op.name.lastIndexOf("_")
+        if (lastIndex < 0)
+            continue
+        val name = op.name.substring(0, lastIndex)
+        if (ns.hasName(name))
+            throw RuntimeException("NaLaQ namespace already has a registered name of $name")
+        ns.setValue(name, op)
+    }
+    registerTypeAndChildren(getTypeByClass(Any::class), ns)
+    return ns
+}
+
+private fun registerTypeAndChildren(type: Type, ns: Namespace) {
+    if (ns.hasName(type.name))
+        throw RuntimeException("NaLaQ namespace already has a registered name of ${type.name}")
+    ns.setValue(type.name, type)
+    for (child in type.childrenTypes)
+        registerTypeAndChildren(child, ns)
 }
 
 private fun getListValues(value: Any?, defaultValue: List<String>): List<String> {
@@ -265,23 +285,24 @@ private fun getMapUris(value: Any?, process: KFunction<Any?>? = null): Map<Strin
     return dst
 }
 
-private fun <T: Enum<T>> selectedEnum(values:()->Array<T>, value: Any?): T? {
+private fun <T: Enum<T>> selectedEnum(valuesFunction:()->Array<T>, value: Any?): T? {
     val txt = value?.toString()?.trim()?.uppercase()
     if (txt.isNullOrBlank())
         return null
-    for (instance in values()) {
+    val values = valuesFunction()
+    for (instance in values) {
         if (instance.name == txt)
             return instance
     }
-    val engines = SpeechEngine.entries.joinToString(" ")
-    throw RuntimeException("Unknown speech engine: $value\nAvailable engines: $engines")
+    val klass = values[0]::class.simpleName
+    throw RuntimeException("Unknown $klass instance: $value\nAvailable $klass values: ${values.joinToString(" ")}")
 }
 
 private fun startConsole(config: Configuration) {
     val textInput = BufferedReader(InputStreamReader(System.`in`))
     if (!config.executeExpression.isNullOrBlank())
         executeExpression(config)
-    var speechInput: BufferedReader? = if (config.speechEngine != null) speechInputStream(null) else null
+    var speechInput: BufferedReader? = if (config.speechModelsFolder != null) speechInputStream(config.language) else null
     var running = true
     while (running) {
         if (config.consolePrompt != null) {
@@ -298,47 +319,45 @@ private fun startConsole(config: Configuration) {
             textInput.readLine()?.trim()
         if (txt.isNullOrBlank())
             continue
-        if (config.exitWords.contains(txt))
-            running = false
-        else if (txt == startAudioWord) {
-            if (speechInput != null)
-                println("Audio listening is already active")
-            else if (config.speechEngine == null)
-                println("Audio listening is not configured")
-            else {
-                speechInput = speechInputStream(null)
-                println("Audio listening is now active")
+        when (txt) {
+            exitWord -> running = false
+            helpWord -> printHelp()
+            startAudioWord -> {
+                if (speechInput != null)
+                    println("Audio listening is already active")
+                else if (config.speechModelsFolder == null)
+                    println("Audio listening is not configured")
+                else {
+                    speechInput = speechInputStream(config.language)
+                    println("Audio listening is now active")
+                }
             }
-        }
-        else if (txt == stopAudioWord) {
-            if (speechInput == null)
-                println("Audio listening is not active")
-            else {
-                speechInput.close()
-                speechInput = null
-                println("Audio listening has stopped")
+            stopAudioWord -> {
+                if (speechInput == null)
+                    println("Audio listening is not active")
+                else {
+                    speechInput.close()
+                    speechInput = null
+                    println("Audio listening has stopped")
+                }
             }
-        }
-        else if (txt.endsWith(" $cancelAudioWord")) {
-            if (speechInput == null)
-                println("Audio is not active")
-            else
-                println("Last audio sentence cancelled")
-        }
-        else if (setOutputFormat(txt))
-            println("output format set to ${outputFormat?.mimetype}")
-        else if (txt == "help")
-            printHelp()
-        else {
-            try {
-                val value = execute(txt, config.expressionPrompt)
-                if (config.resultPrompt != null)
-                    printValue(value, config.resultPrompt, config.voiceCommand)
+            else -> {
+                if (txt.endsWith(" $cancelAudioWord"))
+                    println("Last sentence cancelled")
+                else if (setOutputFormat(txt))
+                    println("output format set to ${outputFormat?.mimetype}")
+                else {
+                    try {
+                        val value = execute(txt, config.expressionPrompt)
+                        if (config.resultPrompt != null)
+                            printValue(value, config.resultPrompt, speaker)
+                    }
+                    catch (e: Exception) { e.printStackTrace() }
+                }
             }
-            catch (e: Exception) { e.printStackTrace() }
         }
     }
-    stopSpeechInput(null)
+    stopSpeechInput(config.language)
 }
 
 private fun executeExpression(config: Configuration) {
@@ -347,16 +366,16 @@ private fun executeExpression(config: Configuration) {
         println(config.consolePrompt+txt)
     val value = execute(txt, config.expressionPrompt)
     if (config.resultPrompt != null)
-        printValue(value, config.resultPrompt, config.voiceCommand)
+        printValue(value, config.resultPrompt, speaker)
 }
 
-private fun printValue(value: Any?, prompt: String, voiceCommand: String?) {
+private fun printValue(value: Any?, prompt: String, speech: SpeechWriter?) {
     var format = outputFormat!!
     println(prompt+format.encodeText(value))
-    if (voiceCommand != null) {
+    if (speech != null) {
         if (format.mimetype != "text/plain")
             format = getFormat("text/plain")!!
-        speaker?.write(format.encodeText(value))
+        speech.write(format.encodeText(value))
     }
 }
 

@@ -129,7 +129,7 @@ private val DEFAULT_PREFIXES = mapOf(
     "rdfs" to "http://www.w3.org/2000/01/rdf-schema#",
     "skos" to "http://www.w3.org/2004/02/skos/core#"
 )
-private val DEFAULT_NAMESPACES = mutableMapOf<String, NaLaQNamespace>()
+private val DEFAULT_NAMESPACES = mutableMapOf<String, GenericNamespace>()
 
 private class WritingContext {
     var namespaces = mutableSetOf<Namespace>()
@@ -150,10 +150,10 @@ private fun initTypesToClasses(): Map<IRI,Class<*>> {
 }
 
 private fun loadDefaultNamespaces() {
-    addNamespace(NaLaQNamespace("_", "http://localhost/", false))
+    addNamespace(GenericNamespace("_", "http://localhost/", false))
     for (prefix in DEFAULT_PREFIXES.keys) {
         val uri = DEFAULT_PREFIXES[prefix]!!
-        val ns = NaLaQNamespace(prefix, uri, true)
+        val ns = GenericNamespace(prefix, uri, true)
         addNamespace(ns)
         DEFAULT_NAMESPACES[prefix] = ns
     }
@@ -183,7 +183,7 @@ private fun decodeRdf(formatName: String, input: InputStream?): Set<Resource> {
     for ((prefix, uri) in collector.namespaces) {
         var ns: Namespace? = getNamespace(prefix) ?: getNamespace(uri)
         if (ns == null)
-            addNamespace(NaLaQNamespace(prefix, uri))
+            addNamespace(GenericNamespace(prefix, uri))
         else if (ns.uri != uri)
             throw RuntimeException("Conflict of prefix $prefix: where old uri is ${ns.uri} but new uri is $uri")
         else if (ns.prefix != prefix)
@@ -260,7 +260,7 @@ fun convertValue(value: Value): Any? {
             val data = ns.value(value.localName) ?: ns.value(ns.prefix + ":" + value.localName)
             if (data != null) return data
         }
-        ns = NaLaQNamespace()
+        ns = GenericNamespace()
         return RdfResource(value.localName, ns)
     }
     if (value is BNode) {

@@ -34,15 +34,15 @@ txtbatch='{
 
 echo "******** running simple expressions test ********"
 nalaq config "$debug" "
-    all
+    dictionary
     42
-    type of all
+    type of dictionary
     type of 42
-    class of all
+    class of dictionary
     class of 42
-    size of all
+    size of dictionary
     size of 42
-    keys of all
+    keys of dictionary
     keys of 42
     continents as ./webapp/json/continent.json
     type of continents
@@ -66,7 +66,7 @@ nalaq config "$batch" "
 " ||exit
 
 echo "******** running simple each test ********"
-nalaq each all key do text key " -> " do type of key done to output null ||exit
+nalaq each dictionary key do text key " -> " do type of key done to output null ||exit
 
 echo "******** running simple with test ********"
 nalaq name region population from ./webapp/json/city.json with country_id is CAN and population more 5e5 ||exit

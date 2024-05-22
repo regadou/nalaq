@@ -18,7 +18,7 @@ outputFormat: text/plain"
 
 if [ -f "$dbprefix$dbpath$dbsuffix" ]; then
     echo "Database file already exists"
-    echo "Please delete all $dbpath files to retry import"
+    echo "Please delete all $dbpath.* files to retry import"
 else
     echo Looking for a VCF file to convert to JSON ...
     if [ -z "$1" ]; then

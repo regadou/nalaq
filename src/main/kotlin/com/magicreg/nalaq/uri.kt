@@ -42,7 +42,7 @@ fun resolveUri(uri: URI, method: UriMethod, headers: Map<String,String>, body: A
                 e
             }
 
-            "nalaq" -> getNaLaQValue(url.toString(), url.query, url.fragment)
+            "nalaq" -> getNalaqValue(url.toString(), url.query, url.fragment)
             "geo" -> GeoLocation(url)
             "sftp" -> RuntimeException("Uri scheme not implemented yet for GET: ${url.scheme}")
             // TODO: mailto and sip could do contact search, check mailbox, voicemail, messages, log history, ...
@@ -86,7 +86,7 @@ private const val CONTENT_TYPE_HEADER = "content-type"
 private val URI_SCHEMES = "http,https,file,data,geo,nalaq,jdbc,sftp,mailto,sip".split(",")
 private val DATA_SERIALIZER = DataUrlSerializer()
 
-private fun getNaLaQValue(uri: String, query: String?, fragment: String?): Any? {
+private fun getNalaqValue(uri: String, query: String?, fragment: String?): Any? {
     val txt = URLDecoder.decode(uri.substring(uri.indexOf(":")+1).split("#")[0].split("?")[0], defaultCharset())
     var value = txt.toExpression().resolve()
     if (!query.isNullOrBlank())
