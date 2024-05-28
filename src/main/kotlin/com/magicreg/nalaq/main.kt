@@ -88,7 +88,7 @@ fun loadConfiguration(args: Array<String>): Configuration? {
         speechModelsFolder = configData["speechModelsFolder"]?.toString(),
         serverPort = configData["serverPort"]?.toString()?.toIntOrNull(),
         namespaces = getMapUris(configData["namespaces"], ::loadNamespace),
-        staticFolder = configData["staticFolder"]?.toString() ?: defaultStaticFolder,
+        webFolder = configData["webFolder"]?.toString() ?: defaultWebFolder,
         startMethod =  configData["startMethod"]?.toString() ?: start,
         executeExpression = exp ?: configData["executeExpression"]?.toString(),
         arguments = arguments
@@ -116,7 +116,7 @@ fun defaultConfiguration(args: Array<String> = emptyArray(), debug: Boolean = fa
         speechModelsFolder = null,
         serverPort = port,
         namespaces = emptyMap(),
-        staticFolder = defaultStaticFolder,
+        webFolder = defaultWebFolder,
         startMethod = if (exp != null) "expression" else if (port > 0) "server" else null,
         executeExpression = exp,
         arguments = arguments
@@ -138,7 +138,7 @@ fun getSpeechWriter(): SpeechWriter? {
 }
 
 private val configWords = "conf,config,configuration".split(",")
-private val defaultStaticFolder = System.getProperty("user.dir")
+private val defaultWebFolder = System.getProperty("user.dir")
 private val scriptPrimaryTypes = "text,application".split(",")
 private const val helpWord = "help"
 private const val dictioWord = "dictionary"

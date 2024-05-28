@@ -54,7 +54,7 @@ data class Configuration(
     val speechModelsFolder: String? = null,
     val serverPort: Int? = null,
     val namespaces: Map<String,URI> = emptyMap(),
-    val staticFolder: String = System.getProperty("user.dir"),
+    val webFolder: String = System.getProperty("user.dir"),
     val startMethod: String? = null,
     val executeExpression: String? = null,
     val arguments: List<String> = emptyList()

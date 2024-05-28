@@ -1,15 +1,3 @@
-echo "checking if required commands are installed ..."
-for cmd in curl pip3 python3 unzip git; do
-    exist=$(which $cmd)
-    if [ -z "$exist" ]; then
-        errors=" $cmd"
-    fi
-done
-if [ -n "$errors" ]; then
-    echo "Command files missing:$errors"
-    exit 1
-fi
-
 echo "installing speech to text models (vosk) ..."
 mkdir models
 models='vosk-model-small-en-us-0.15
@@ -89,6 +77,28 @@ deactivate
 fi
 
 echo "installing translator (LibreTranslate) ..."
-pip3 install libretranslate || exit 10
-libretranslate 2>&1 > translations.log &
+python3 -m venv .venv
+source .venv/bin/activate
+pip3 install libretranslate
+
+script=libtranslate.sh
+link="/usr/local/bin/libretranslate"
+if [ -e $link ]; then
+    echo "$link is already installed"
+else
+    echo '#!/bin/bash
+source '$(pwd)'/.venv/bin/activate
+port=5000
+if [ -n "$1" ]; then
+    port=$1
+fi
+echo "starting libtranslate on port $port ..."
+libretranslate --port $port  2>&1 > '$(pwd)'/server.log &
+deactivate
+' > $script
+    chmod 755 $script
+    sudo ln -s $(pwd)/$script $link
+fi
+deactivate
 # TODO: create a service script to start the server at boot time
+

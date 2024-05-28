@@ -12,3 +12,4 @@ else
     echo Found $(echo "$procid"|grep -Fc "") NaLaQ process to kill ...
     kill -9 $procid
 fi
+

@@ -1,0 +1,35 @@
+<html>
+<head>
+    <title>NaLaQ Translator</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="style.css"/>
+    <script src="translator.js"></script>
+</head>
+<body theme="magicreg" onload="init()">
+    <h1 style="text-align:center;font-size:30px">NaLaQ Translator</h1>
+    <table style="margin:0;width:{width}px;height:{height}px">
+        <tr>
+            <td colspan=2 style="padding:5px;vertical-align:top;text-align:center">
+                <select id="audio" onchange="setAudioDevice(this)" style="height:{hbutton}px">
+                    <option value="">Select audio input device</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:5px;vertical-align:top;text-align:center;width:50%">
+                <div id=chatlog style="overflow:overlay;max-height:{maxhl}px"></div>
+            </td>
+            <td style="padding:5px;vertical-align:top;text-align:center">
+                <div id=content style="overflow:overlay"></div>
+            </td>
+        </tr>
+    <tr>
+        <td colspan=1 rowspan=1 style="padding:5px;vertical-align:middle;height:{hbottom}px">
+            <textarea id=message style="width:{wtextarea}px;height:{htextarea}px"></textarea><br>
+            <input type=button value="Send message" onclick="sendText('message','chatlog','chatline')" style="height:{hbutton}px">
+        </td>
+    </tr>
+    </table>
+</body>
+</html>
+

@@ -4,9 +4,9 @@ models=$1
 slang=$2
 tlang=$3
 if [ -z "$models" -o -z "$slang" -o -z "$tlang" ]; then
-   echo "Usage: scripts/voice.sh <models-folder> <source-language> <target-language>"
+   echo "Usage: scripts/translate.sh <models-folder> <source-language> <target-language>"
    echo "Make sure you have LibreTranslate running locally on port 5000 and glowspeak script installed in your path"
-   echo "Otherwise, change the config values in the script to reflect what is your system setup"
+   echo "Otherwise, change the config values in the script to reflect your system setup"
    exit
 fi
 config="---
@@ -20,3 +20,4 @@ language: $slang
 targetLanguage: $tlang
 "
 nalaq config "$config"
+

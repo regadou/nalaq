@@ -15,3 +15,4 @@ if [ ! -d $folder ]; then
     unzip build/dis*/* -d build || exit
 fi
 build/nalaq*/bin/nalaq "$@"
+

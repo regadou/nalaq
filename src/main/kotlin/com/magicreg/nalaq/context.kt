@@ -211,7 +211,7 @@ class Context(
         if (uri.startsWith("file:"))
             return file.toURI()
         var path = file.canonicalFile.toString()
-        val basePath = File(configuration.staticFolder).canonicalFile.toString()
+        val basePath = File(configuration.webFolder).canonicalFile.toString()
         if (path.startsWith(basePath))
             path = path.substring(basePath.length)
         if (!path.startsWith("/"))
@@ -223,10 +223,10 @@ class Context(
         if (uri.startsWith("file"))
             return if (path.startsWith("/")) File(path) else File(URI(uri).path, path)
         if (path.startsWith("/"))
-            return File(configuration.staticFolder, path.substring(1))
+            return File(configuration.webFolder, path.substring(1))
         if (requestUri == null)
-            return File(configuration.staticFolder, path)
-        return File(configuration.staticFolder, parentFolder()+path)
+            return File(configuration.webFolder, path)
+        return File(configuration.webFolder, parentFolder()+path)
     }
 
     override fun toString(): String {

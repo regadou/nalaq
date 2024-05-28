@@ -1,8 +1,9 @@
+start_time=$(date '+%Y-%m-%d %H:%M:%S')
 baseurl="$1"
 jarname="nalaq-all.jar"
 languages="install-languages.sh"
 translator="translator.sh"
-request="request.html"
+webapp="webapp.zip"
 folder="$HOME/nalaq"
 
 if [ -z "$baseurl" ]; then
@@ -10,21 +11,29 @@ if [ -z "$baseurl" ]; then
     exit 1
 fi
 
-start_time=$(date '+%Y-%m-%d %H:%M:%S')
-echo "Looking for java installation ..."
-version=$(which java|java -version 2>&1|grep version)
-if [ -z "$version" ]; then
-    echo "No java executable found, please install a JVM"
+echo "checking if required commands are installed ..."
+for cmd in curl pip3 python3 unzip git java; do
+    exist=$(which $cmd)
+    if [ -z "$exist" ]; then
+        errors=" $cmd"
+    fi
+done
+if [ -n "$errors" ]; then
+    echo "Command files missing:$errors"
     exit 2
 fi
-echo "Found java executable $version"
+venv=$(python3 -c "import venv" 2>/dev/null && echo yes || echo no)
+if [ "$venv" == "no" ]; then
+    echo "Python venv is not installed, please install it before running this install script"
+    exit 2
+fi
 
 echo "Looking for previous NaLaQ installation ..."
 if [ -d "$folder" ]; then
     echo "$folder already exists, updating installation ..."
 elif [ -f "$folder" ]; then
     echo "$folder is an existing file, please delete or rename it"
-    exit 3
+    exit 4
 else
     echo "Creating new folder $folder ..."
     result=$(mkdir "$folder" && echo yes || echo no)
@@ -32,7 +41,7 @@ else
         echo "Folder $folder created"
     else
         echo "Could not create $folder"
-        exit 4
+        exit 5
     fi
 fi
 
@@ -43,7 +52,7 @@ if [ "$result" = "yes" ]; then
     echo "Jar file downloaded"
 else
     echo "Could not download $jar"
-    exit 5
+    exit 6
 fi
 
 echo "Installing nalaq executable ..."
@@ -59,22 +68,16 @@ java -jar $folder/$jarname $@
     sudo ln -s $script $link || exit 6
 fi
 
-echo "Downloading request HTML script ..."
-result=$(curl -sLfo "$folder/$request" "$baseurl/$request" && echo yes || echo no)
+echo "Downloading and installing webapp archive ..."
+result=$(curl -sLfo "$folder/$webapp" "$baseurl/$webapp" && echo yes || echo no)
 if [ "$result" = "yes" ]; then
-    echo "Request HTML script downloaded"
+    previous=$(pwd)
+    cd $folder
+    unzip $webapp
+    cd $previous
 else
-    echo "Could not download $baseurl/$request"
+    echo "Could not download $baseurl/$webapp"
     exit 7
-fi
-
-echo "Downloading translation demo ..."
-result=$(curl -sLfo "$folder/$translator" "$baseurl/$translator" && echo yes || echo no)
-if [ "$result" = "yes" ]; then
-    echo "Translation demo downloaded"
-else
-    echo "Could not download $baseurl/$translator"
-    exit 8
 fi
 
 echo "Downloading languages script ..."
@@ -83,7 +86,7 @@ if [ "$result" = "yes" ]; then
     echo "Language script file downloaded"
 else
     echo "Could not download $baseurl/$languages"
-    exit 9
+    exit 8
 fi
 
 while true; do
@@ -93,8 +96,8 @@ while true; do
         "y" )
             previous=$(pwd)
             cd $folder
-            bash $folder/$languages || exit 10
-            cd previous
+            bash $folder/$languages || exit 9
+            cd $previous
             break
             ;;
         "n" )
@@ -110,22 +113,18 @@ end_time=$(date '+%Y-%m-%d %H:%M:%S')
 echo "The NaLaQ installation have been completed and lasted from $start_time to $end_time"
 
 while true; do
-    read -n 1 -p "Do you want to start the server[s], the console[c], the translator[t] or none[n] ?" answer < /dev/tty
+    read -n 1 -p "Do you want to start the server[s], the console[c] or none[n] ?" answer < /dev/tty
     echo ""
     case $answer in
         "c" ) nalaq < /dev/tty; break;;
         "s" )
-            port=$(echo $(( $RANDOM % 10000 + 10000 )))
-            nalaq $port &
+            lport=$(echo $(( $RANDOM % 10000 + 10000 )))
+            libretranslate $lport
+            nport=$(echo $(( $RANDOM % 10000 + 10000 )))
+            config="serverPort=$nport&webFolder=$folder/webapp&startMethod=server&speechModelsFolder=$folder/models&voiceCommand=glowspeak&translateEndpoint=http://localhost:$lport/translate" 
+            nalaq config "$config" &
             sleep 3
-            open http://localhost:$port &
-            break;;
-        "t" )
-            if [ -d $folder/modesl && -d $folder/glow-speak ]; then
-                bash $folder/$translator $folder/models < /dev/tty
-            else
-                echo "Cannot start the translation demo: language files are not installed"
-            fi
+            open http://localhost:$nport &
             break;;
         "n" )
             echo "You can later start the NaLaQ application by executing the command nalaq"

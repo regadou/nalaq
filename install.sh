@@ -11,16 +11,25 @@ src="build/nalaq-$version/bin/nalaq"
 dst="$target/nalaq"
 jsrc="build/nalaq-$version/lib/nalaq-$version.jar"
 jdst="~/.m2/repository/com/magicreg/nalaq/$version/nalaq-$version.jar"
-if [ -f $src ]; then
-    echo "NaLaQ artefact already compiled"
-else
-    ./run.sh clean dictionary || exit
-fi
+download="download/nalaq-all.jar"
+zip="download/webapp.zip"
+
+echo "Compiling NaLaQ application ..."
+./run.sh clean dictionary || exit
 
 echo "Building NaLaQ fat jar ..."
-gradle publishToMavenLocal||exit
+gradle publishToMavenLocal || exit
+if [ ! -e $download ]; then
+    ln -s "$jdst" "$download"
+fi
 
-if [ -f $dst ]; then
+echo "Zipping webapp folder ..."
+if [ -e $zip ]; then
+    rm "$zip"
+fi
+zip -r $zip webapp || exit
+
+if [ -e $dst ]; then
     echo "NaLaQ command line already installed"
 else
     echo "installing NaLaQ command line at $target ..."

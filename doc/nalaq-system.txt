@@ -80,6 +80,6 @@
     - uses getContext and findContext public functions for context management
 - HTTP server implemented with ktor in server.kt file:
   - dynamic routing configured by the Configuration class passed in command line arguments
-  - server port, namespaces, static files folder and apis endpoints can be configured
+  - server port, namespaces, web folder and apis endpoints can be configured
   - if an api endpoint resolves to a function, a POST or PUT query can execute it with the request body as parameters of the function
   

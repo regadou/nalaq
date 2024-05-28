@@ -126,14 +126,14 @@ private fun httpRequest(cx: Context, request: HttpRequest): ResponseData {
 }
 
 private fun getRequest(cx: Context, request: HttpRequest): ResponseData {
-    val baseuri = cx.configuration.staticFolder ?: "."
+    val baseuri = cx.configuration.webFolder ?: "."
     if (request.path == "/")
         return printLinks(File(baseuri).list(), "/", baseuri, request.query)
     return getFileContent(cx, request, request.path)
 }
 
 private fun getFileContent(cx: Context, request: HttpRequest, filename: String): ResponseData {
-    val baseuri = cx.configuration.staticFolder ?: "."
+    val baseuri = cx.configuration.webFolder ?: "."
     val file = File(baseuri+filename)
     if (file.exists()) {
         if (file.isDirectory) {
@@ -151,7 +151,7 @@ private fun getFileContent(cx: Context, request: HttpRequest, filename: String):
 }
 
 private fun postRequest(cx: Context, request: HttpRequest): ResponseData {
-    val baseuri = cx.configuration.staticFolder ?: "."
+    val baseuri = cx.configuration.webFolder ?: "."
     val filename = request.path
     val file = File(baseuri+filename)
     if (file.exists()) {
@@ -182,7 +182,7 @@ private fun postFileExecute(cx: Context, request: HttpRequest, file: File): Resp
 private fun putRequest(cx: Context, request: HttpRequest): ResponseData {
     if (request.path == "/")
         return ResponseData(StatusCode_MethodNotAllowed, DEFAULT_MIMETYPE, "")
-    val baseuri = cx.configuration.staticFolder ?: "."
+    val baseuri = cx.configuration.webFolder ?: "."
     val filename = request.path
     val file = File(baseuri+filename)
     if (file.exists()) {
@@ -202,7 +202,7 @@ private fun deleteRequest(cx: Context, request: HttpRequest): ResponseData {
     if (request.path == "/")
         return ResponseData(StatusCode_MethodNotAllowed, DEFAULT_MIMETYPE, "")
     val filename = request.path
-    val baseuri = cx.configuration.staticFolder ?: "."
+    val baseuri = cx.configuration.webFolder ?: "."
     val file = File(baseuri+filename)
     // TODO: add script support or delete file or block from deleting file
     val result = if (file.exists()) file.delete() else false
