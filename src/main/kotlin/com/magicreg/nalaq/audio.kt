@@ -196,6 +196,7 @@ class AudioType(val type: AudioFileFormat.Type): Format {
     private val labels: List<String> = audioFormatsMap[type.extension] ?: throw RuntimeException("Unknown audio extension ${type.extension} from $type")
     override val mimetype: String = labels[0]
     override val extensions: List<String> = labels.subList(1, labels.size)
+    override val scripting: Boolean = false
     override val supported: Boolean = true
 
     override fun decode(input: InputStream, charset: String): Any? {

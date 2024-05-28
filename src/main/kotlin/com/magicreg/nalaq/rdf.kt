@@ -81,6 +81,7 @@ class RdfResource(override val id: String, override val namespace: Namespace): R
 
 class RdfFormat(val syntax: RDFFormat, override val mimetype: String) : Format {
     override val extensions: List<String> = syntax.fileExtensions
+    override val scripting: Boolean = false
     override val supported: Boolean = true
     val readerFactory: RDFParserFactory = getFactory(syntax, RDFParserFactory::class.java)
     val writerFactory: RDFWriterFactory = getFactory(syntax, RDFWriterFactory::class.java)

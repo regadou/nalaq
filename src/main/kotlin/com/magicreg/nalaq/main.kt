@@ -2,8 +2,10 @@ package com.magicreg.nalaq
 
 import org.apache.commons.beanutils.BeanMap
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 import java.net.URI
+import java.nio.charset.Charset
 import java.util.*
 import kotlin.reflect.KFunction
 
@@ -12,7 +14,7 @@ fun main(args: Array<String>) {
     if (config != null)
         runConfiguration(config)
     else if (args.isNotEmpty())
-        runConfiguration(defaultConfiguration(args.joinToString(" ")))
+        runConfiguration(defaultConfiguration(args))
     else
         runConfiguration(defaultConfiguration())
 }
@@ -42,8 +44,8 @@ fun loadConfiguration(args: Array<String>): Configuration? {
     else if (args.size == 1 || args[1] == "help")
         return printHelp()
     else if (args[1] == "debug") {
-        val exp = if (args.size > 2) args.toList().subList(2, args.size).joinToString(" ") else null
-        return defaultConfiguration(exp, true)
+        val subArgs = if (args.size > 2) args.toList().subList(2, args.size).toTypedArray() else emptyArray()
+        return defaultConfiguration(subArgs, true)
     }
     else {
         offset = 2
@@ -56,11 +58,19 @@ fun loadConfiguration(args: Array<String>): Configuration? {
         throw value
 
     val configData = toMap(value)
+    val arguments = mutableListOf<String>()
     var start: String? = null
     var exp: String? = null
+    var parser: TextParser? = null
     if (args.size > offset) {
         start = "expression"
-        exp = args.toList().subList(offset, args.size).joinToString(" ")
+        val subArgs = args.toList().subList(offset, args.size)
+        val pair = loadScriptFile(subArgs)
+        parser = pair.first
+        val script = pair.second
+        exp = script ?: subArgs.joinToString(" ")
+        if (script != null)
+            arguments.addAll(subArgs.subList(1, subArgs.size))
     }
 
     return Configuration(
@@ -73,21 +83,23 @@ fun loadConfiguration(args: Array<String>): Configuration? {
         targetLanguage = configData["targetLanguage"]?.toString(),
         translateEndpoint = configData["translateEndpoint"]?.toUri(),
         voiceCommand = configData["voiceCommand"]?.toString(),
-        textParser = selectedEnum(TextParser::values, configData["textParser"]) ?: TextParser.entries[0],
+        textParser = parser ?: selectedEnum(TextParser::values, configData["textParser"]) ?: TextParser.entries[0],
         nlpModelsFolder = configData["nlpModelsFolder"]?.toString(),
         speechModelsFolder = configData["speechModelsFolder"]?.toString(),
-        picoAccessKey = configData["picoAccessKey"]?.toString(),
         serverPort = configData["serverPort"]?.toString()?.toIntOrNull(),
         namespaces = getMapUris(configData["namespaces"], ::loadNamespace),
         staticFolder = configData["staticFolder"]?.toString() ?: defaultStaticFolder,
         startMethod =  configData["startMethod"]?.toString() ?: start,
-        executeExpression = exp ?: configData["executeExpression"]?.toString()
+        executeExpression = exp ?: configData["executeExpression"]?.toString(),
+        arguments = arguments
     )
 }
 
-fun defaultConfiguration(expression: String? = null, debug: Boolean = false): Configuration {
-    val port = expression?.trim()?.toIntOrNull() ?: 0
-    val exp = if (port > 0 || expression.isNullOrBlank()) null else expression
+fun defaultConfiguration(args: Array<String> = emptyArray(), debug: Boolean = false): Configuration {
+    val port = if (args.size == 1) args[0].toIntOrNull()?:0 else 0
+    val (parser, script) = loadScriptFile(args.toList())
+    val arguments = if (script != null) args.toList().subList(1, args.size) else emptyList()
+    val exp = script ?: if (port > 0 || args.isEmpty()) null else args.joinToString(" ")
     val lineCount = exp?.split("\n")?.filter(::notEmptyNorComment)?.size ?: 0
     return Configuration(
         consolePrompt = if (exp == null || debug) defaultConsolePrompt else null,
@@ -99,15 +111,15 @@ fun defaultConfiguration(expression: String? = null, debug: Boolean = false): Co
         targetLanguage = null,
         translateEndpoint = null,
         voiceCommand = null,
-        textParser = TextParser.entries[0],
+        textParser = parser ?: TextParser.entries[0],
         nlpModelsFolder = null,
         speechModelsFolder = null,
-        picoAccessKey = null,
         serverPort = port,
         namespaces = emptyMap(),
         staticFolder = defaultStaticFolder,
         startMethod = if (exp != null) "expression" else if (port > 0) "server" else null,
-        executeExpression = exp
+        executeExpression = exp,
+        arguments = arguments
     )
 }
 
@@ -127,6 +139,7 @@ fun getSpeechWriter(): SpeechWriter? {
 
 private val configWords = "conf,config,configuration".split(",")
 private val defaultStaticFolder = System.getProperty("user.dir")
+private val scriptPrimaryTypes = "text,application".split(",")
 private const val helpWord = "help"
 private const val dictioWord = "dictionary"
 private const val exitWord = "exit"
@@ -193,14 +206,14 @@ private fun validateLanguages(config: Configuration) {
             errors.add("Invalid target language: ${config.targetLanguage}")
     }
 
-    if (config.speechModelsFolder != null) {
+    if (config.speechModelsFolder != null && config.startMethod != "server") {
         if (srclang == null)
             errors.add("Invalid language: ${config.language}")
         else if (srclang.model.isNullOrBlank())
             errors.add("No existing model for this language: ${config.language}")
     }
 
-    if (config.voiceCommand != null) {
+    if (config.voiceCommand != null && config.startMethod != "server") {
         val lang = if (config.textParser == TextParser.TRANSLATE) dstlang ?: srclang else srclang
         if (lang == null) {
             if (errors.isEmpty())
@@ -220,35 +233,31 @@ private fun validateLanguages(config: Configuration) {
 }
 
 private fun nalaqNamespace(config: Configuration): Namespace {
-    val ns: Namespace = GenericNamespace(
-        prefix = NALAQ_PREFIX,
-        uri = NALAQ_URI,
-        readOnly= true
-    ).populate(mapOf(
+    val map = mutableMapOf<String,Any?>(
         dictioWord to KotlinPropertyReference(Context::names, Context::class),
         "true" to true,
         "false" to false,
         "null" to ValueReference(null, true)
-    ))
+    )
     for (op in builtinOperators()) {
         val lastIndex = op.name.lastIndexOf("_")
         if (lastIndex < 0)
             continue
         val name = op.name.substring(0, lastIndex)
-        if (ns.hasName(name))
+        if (map.containsKey(name))
             throw RuntimeException("NaLaQ namespace already has a registered name of $name")
-        ns.setValue(name, op)
+        map[name] = op
     }
-    registerTypeAndChildren(getTypeByClass(Any::class), ns)
-    return ns
+    registerTypeAndChildren(getTypeByClass(Any::class), map)
+    return GenericNamespace(NALAQ_PREFIX, NALAQ_URI, true).populate(map)
 }
 
-private fun registerTypeAndChildren(type: Type, ns: Namespace) {
-    if (ns.hasName(type.name))
+private fun registerTypeAndChildren(type: Type, map: MutableMap<String,Any?>) {
+    if (map.containsKey(type.name))
         throw RuntimeException("NaLaQ namespace already has a registered name of ${type.name}")
-    ns.setValue(type.name, type)
+    map[type.name] = type
     for (child in type.childrenTypes)
-        registerTypeAndChildren(child, ns)
+        registerTypeAndChildren(child, map)
 }
 
 private fun getListValues(value: Any?, defaultValue: List<String>): List<String> {
@@ -296,6 +305,24 @@ private fun <T: Enum<T>> selectedEnum(valuesFunction:()->Array<T>, value: Any?):
     }
     val klass = values[0]::class.simpleName
     throw RuntimeException("Unknown $klass instance: $value\nAvailable $klass values: ${values.joinToString(" ")}")
+}
+
+private fun loadScriptFile(args: List<String>): Pair<TextParser?, String?> {
+    if (args.isNotEmpty()) {
+        val file = File(args[0])
+        val format = getFormat(file.extension)
+        if (file.exists() && file.isFile && format != null && format.supported && scriptPrimaryTypes.contains(format.mimetype.split("/")[0]))
+            return Pair(getTextParser(format.mimetype), file.readText(Charset.forName(defaultCharset())))
+    }
+    return Pair(null, null)
+}
+
+private fun getTextParser(mimetype: String): TextParser? {
+    for (parser in TextParser.entries) {
+        if (mimetype.contains(parser.name.lowercase()))
+            return parser
+    }
+    return null
 }
 
 private fun startConsole(config: Configuration) {

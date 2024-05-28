@@ -64,6 +64,7 @@ class GenericFormat(
     override val extensions: List<String>,
     private val decoder: (InputStream, String) -> Any?,
     private val encoder: (Any?, OutputStream, String) -> Unit,
+    override val scripting: Boolean,
     override val supported: Boolean
 ): Format {
     override fun decode(input: InputStream, charset: String): Any? {
@@ -89,6 +90,7 @@ private val JSON_SERIALIZER_CLASSES = listOf(Type::class, KClass::class, KCallab
 private val CSV_FORMAT = configureCsvFormat()
 private val JSON_MAPPER = configureJsonMapper(ObjectMapper())
 private val YAML_MAPPER = configureJsonMapper(ObjectMapper(YAMLFactory()))
+private val SCRIPTING_FORMATS = unsupportedScriptingFormats()
 private val EXTENSIONS = mutableMapOf<String,Format>()
 private val MIMETYPES = loadMimeTypesFile()
 
@@ -132,12 +134,13 @@ private fun loadMimeTypesFile(): MutableMap<String,Format> {
                 extensions.add(token)
         }
         if (mimetype != null) {
+            val scripting = SCRIPTING_FORMATS[mimetype] ?: false
             if (mimetypes[mimetype] != null)
                 ;
             else if (mimetype.split("/")[0] == "text")
-                addMimetype(mimetypes, ::decodeString, ::encodeString, mimetype, extensions, false)
+                addMimetype(mimetypes, ::decodeString, ::encodeString, mimetype, extensions, scripting, false)
             else
-                addMimetype(mimetypes, ::decodeBytes, ::encodeBytes, mimetype, extensions, false)
+                addMimetype(mimetypes, ::decodeBytes, ::encodeBytes, mimetype, extensions, scripting, false)
         }
     }
     reader.close()
@@ -148,8 +151,9 @@ private fun addMimetype(mimetypes: MutableMap<String,Format>,
                         decoder: (InputStream, String) -> Any?,
                         encoder: (Any?, OutputStream, String) -> Unit,
                         mimetype: String, extensions: List<String>,
+                        scripting: Boolean = false,
                         supported: Boolean = true) {
-    val format = GenericFormat(mimetype, extensions, decoder, encoder, supported)
+    val format = GenericFormat(mimetype, extensions, decoder, encoder, scripting, supported)
     mimetypes[mimetype] = format
     addExtensions(format)
 }
@@ -169,7 +173,8 @@ private fun initManagedMimetypes(): MutableMap<String,Format> {
     addMimetype(formats, ::decodeProperties, ::encodeProperties, "text/x-java-properties", listOf("properties"))
     addMimetype(formats, ::decodeCsv, ::encodeCsv, "text/csv", listOf("csv"))
     addMimetype(formats, ::decodeUris, ::encodeUris, "text/uri-list", listOf("uris", "uri"))
-    addMimetype(formats, ::decodeNalaq, ::encodeNalaq, "text/x-nalaq", listOf("nalaq, nlq"))
+    addMimetype(formats, ::decodeNalaq, ::encodeNalaq, "text/x-nalaq", listOf("nalaq", "nlq"), true)
+    addMimetype(formats, ::decodeKotlin, ::encodeKotlin, "text/x-kotlin", listOf("kts", "kt"), true)
     addMimetype(formats, ::decodeJson, ::encodeJson, "application/json", listOf("json"))
     addMimetype(formats, ::decodeYaml, ::encodeYaml, "application/yaml", listOf("yaml"))
     addMimetype(formats, ::decodeHtml, ::encodeHtml, "text/html", listOf("html", "htm"))
@@ -299,6 +304,14 @@ private fun decodeNalaq(input: InputStream, charset: String): Any? {
 
 private fun encodeNalaq(value: Any?, output: OutputStream, charset: String) {
     output.write((value.toText()+"\n").toByteArray(Charset.forName(charset)))
+}
+
+private fun decodeKotlin(input: InputStream, charset: String): Any? {
+    return ScriptEngineParser("kts", getContext(), emptyList()).parse(input.readAllBytes().toString(Charset.forName(charset)))
+}
+
+private fun encodeKotlin(value: Any?, output: OutputStream, charset: String) {
+    output.write((value.toString()+"\n").toByteArray(Charset.forName(charset)))
 }
 
 private fun decodeCsv(input: InputStream, charset: String): Any {
@@ -542,4 +555,32 @@ private fun detectSeparator(input: InputStream): Char {
             break
     }
     return CSV_SEPARATORS[0]
+}
+
+private fun unsupportedScriptingFormats(): Map<String,Boolean> {
+    return """
+        text/x-csh
+        text/x-perl
+        text/x-python
+        text/x-sh
+        text/x-tcl
+        application/x-csh
+        application/x-ruby
+        application/x-sh
+        application/x-shar
+        application/x-tcl
+        application/x-trash
+        application/x-xpinstall
+        application/x-xz
+        text/x-cgi
+        text/x-php
+        text/x-asp
+        text/x-jsp
+        text/x-jss 
+        text/x-ssjs
+        text/x-groovy
+        text/x-lua
+        text/x-clojure
+        text/x-nodejs
+    """.trimIndent().trim().split("\n").associateWith { true }
 }

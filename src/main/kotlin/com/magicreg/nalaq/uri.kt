@@ -36,12 +36,7 @@ fun resolveUri(uri: URI, method: UriMethod, headers: Map<String,String>, body: A
             "http", "https" -> httpRequest("get", url, headers)
             "file" -> getFile(url.path)
             "data" -> decodeData(url.toString())
-            "jdbc" -> try {
-                Database(url.toString())
-            } catch (e: Exception) {
-                e
-            }
-
+            "jdbc" -> try { Database(url.toString()) } catch (e: Exception) {e}
             "nalaq" -> getNalaqValue(url.toString(), url.query, url.fragment)
             "geo" -> GeoLocation(url)
             "sftp" -> RuntimeException("Uri scheme not implemented yet for GET: ${url.scheme}")

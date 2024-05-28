@@ -5,6 +5,12 @@ plugins {
     id("maven-publish")
 }
 
+tasks {
+    shadowJar {
+        isZip64 = true
+    }
+}
+
 group = "com.magicreg"
 version = "0.1-SNAPSHOT"
 
@@ -29,6 +35,8 @@ dependencies {
     implementation("io.ktor:ktor-server-core-jvm")
     implementation("io.ktor:ktor-server-netty-jvm")
     implementation("io.ktor:ktor-server-sessions-jvm")
+    implementation("org.jetbrains.kotlin:kotlin-scripting-jsr223")
+    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")
     implementation("commons-beanutils:commons-beanutils:1.9.4")
     implementation("com.alphacephei:vosk:0.3.45")
     implementation("org.apache.opennlp:opennlp-tools:2.3.3")

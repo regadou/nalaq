@@ -24,6 +24,10 @@ class GenericParser(): Parser {
             return compileExpressions(ParserStatus(first.lines), true)
         return compileTokens(LineStatus(tokens), true)
     }
+
+    override fun toString(): String {
+        return "GenericParser"
+    }
 }
 
 private class ParserStatus(
@@ -94,7 +98,7 @@ private fun getTokenValue(txt: String): Any? {
         ?: txt.toDoubleOrNull()
         ?: txt.toTemporal()
         ?: txt.toUri()
-        ?: txt.toJvm()
+        ?: txt.toJvmObject()
         ?: NameReference(txt)
     }
     return if (value is URI && value.readOnly()) value.resolve() else value

@@ -1,4 +1,3 @@
 #!/bin/sh
 
-kotlin -cp $(ls $(pwd)/build/nalaq-0.1-SNAPSHOT/lib/*.jar|xargs|tr ' ' :) $@
-
+nalaq config "textParser=kotlin&outputFormat=text/x-kotlin" $@

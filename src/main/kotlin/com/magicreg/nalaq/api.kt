@@ -4,9 +4,9 @@ import ezvcard.VCard
 import org.apache.commons.beanutils.BeanMap
 import org.jsoup.nodes.Element
 import java.io.*
+import java.lang.reflect.AnnotatedElement
 import java.lang.reflect.Constructor
 import java.lang.reflect.Field
-import java.lang.reflect.Member
 import java.lang.reflect.Method
 import java.net.URI
 import java.net.URL
@@ -36,7 +36,7 @@ enum class CompareOperator(val symbol: String, val function: KFunction<Any?>) {
     MATCH("~", ::match_func), NOT_MATCH("!~", ::not_match_func)
 }
 enum class LogicOperator { OR, AND }
-enum class TextParser { NALAQ, NLP, TRANSLATE }
+enum class TextParser { NALAQ, NLP, TRANSLATE, KOTLIN }
 enum class UriMethod { GET, POST, PUT, DELETE }
 
 data class Configuration(
@@ -52,12 +52,12 @@ data class Configuration(
     val textParser: TextParser = TextParser.entries[0],
     val nlpModelsFolder: String? = null,
     val speechModelsFolder: String? = null,
-    val picoAccessKey: String? = null,
     val serverPort: Int? = null,
     val namespaces: Map<String,URI> = emptyMap(),
     val staticFolder: String = System.getProperty("user.dir"),
     val startMethod: String? = null,
     val executeExpression: String? = null,
+    val arguments: List<String> = emptyList()
 )
 
 class Expression(
@@ -87,6 +87,7 @@ interface Filterable {
 interface Format {
     val mimetype: String
     val extensions: List<String>
+    val scripting: Boolean
     val supported: Boolean
 
     fun decode(input: InputStream, charset: String): Any?
@@ -612,30 +613,31 @@ fun KFunction<*>.precedence(): Int {
 }
 
 fun KFunction<*>.execute(parameters: List<Any?>): Any? {
-    val funcParams = this.parameters
-    if (funcParams.isEmpty())
+    if (this.parameters.isEmpty())
         return this.call()
-
-    if (funcParams.size == 1) {
-        val param = funcParams[0]
+    if (this.parameters.size == 1) {
+        val param = this.parameters[0]
         val type = param.type.classifier!! as KClass<*>
-        if (param.isVararg)
-            return parameters.map{convert(it,type)}.toTypedArray()
-        if (type.isInstance(parameters))
-            return arrayOf(parameters)
-        val value = if (parameters.isEmpty()) null else parameters[0]
-        return arrayOf(convert(value, type))
+        val callParam = if (param.isVararg)
+            parameters.map{convert(it,type)}.toTypedArray()
+        else if (type.isInstance(parameters))
+            parameters
+        else {
+            val value = if (parameters.isEmpty()) null else parameters[0]
+            convert(value, type)
+        }
+        return this.call(callParam)
     }
 
     val targetParams = mutableListOf<Any?>()
-    for ((index,param) in funcParams.withIndex()) {
+    for ((index,param) in this.parameters.withIndex()) {
         val value = if (index >= parameters.size) null else parameters[index]
         targetParams.add(convert(value, param.type.classifier!! as KClass<*>))
     }
-    val lastParam = funcParams[funcParams.size-1]
+    val lastParam = this.parameters[this.parameters.size-1]
     if (lastParam.isVararg) {
         val type = lastParam.type.classifier!! as KClass<*>
-        var left = parameters.size - funcParams.size
+        var left = parameters.size - this.parameters.size
         while (left > 0) {
             targetParams.add(convert(parameters[parameters.size-left], type))
             left--
@@ -718,10 +720,10 @@ fun String.toClass(): KClass<*>? {
     return null
 }
 
-fun String.toJvm(): Member? {
+fun String.toJvmObject(): AnnotatedElement? {
     val value = this.toClass()
     if (value != null)
-        return value.java as Member
+        return value.java
     val index = this.lastIndexOf(".")
     if (index > 0) {
         val klass = this.substring(0, index).toClass() ?: return null
@@ -734,6 +736,18 @@ fun String.toJvm(): Member? {
 
 fun String.toExpression(): Expression {
     return getContext().getParser().parse(this)
+}
+
+fun String.translate(srclang: String, dstlang: String): String {
+    return TranslateParser().translate(srclang, dstlang, this)
+}
+
+fun String.speak(lang: String): AudioStream {
+    throw RuntimeException("String.speak not implemented yet")
+}
+
+fun AudioStream.speech(lang: String): String {
+    throw RuntimeException("AudioStream.speech not implemented yet")
 }
 
 fun Number.toBytes(): ByteArray {

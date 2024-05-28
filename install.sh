@@ -14,15 +14,11 @@ jdst="~/.m2/repository/com/magicreg/nalaq/$version/nalaq-$version.jar"
 if [ -f $src ]; then
     echo "NaLaQ artefact already compiled"
 else
-    ./run.sh clean all || exit
+    ./run.sh clean dictionary || exit
 fi
 
-if [ ! -f $src ] || [ $jsrc -nt $jdst ]; then
-    echo "Copying NaLaQ jar to local maven cache ..."
-    gradle publishToMavenLocal||exit
-else
-    echo "Maven cache already have the most recent NaLaQ jar"
-fi
+echo "Building NaLaQ fat jar ..."
+gradle publishToMavenLocal||exit
 
 if [ -f $dst ]; then
     echo "NaLaQ command line already installed"

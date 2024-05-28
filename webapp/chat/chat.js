@@ -71,9 +71,9 @@ async function sendText(inputId, outputId, lineId) {
     const input = document.querySelector("#"+inputId)
     const chatlog = document.querySelector("#"+outputId)
     const text = input.value
-    const response = await fetch("/dictionary/expression", {
+    const response = await fetch(document.URL, {
         method: 'POST',
-        headers: {'Content-Type': 'text/plain'},
+        headers: {'Content-Type': 'text/x-nalaq', 'Accept': 'text/plain'},
         body: text
     }).then(r => r.text()).catch(e => e.toString())
     chatlog.innerHTML += applyTemplate(lineId, null, {prompt: "?", text: text})

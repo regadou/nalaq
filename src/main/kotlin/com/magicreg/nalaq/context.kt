@@ -188,6 +188,7 @@ class Context(
             TextParser.NALAQ -> GenericParser()
             TextParser.NLP -> NlpParser(configuration.nlpModelsFolder ?: throw RuntimeException("NLP model folder was not specified"))
             TextParser.TRANSLATE -> TranslateParser()
+            TextParser.KOTLIN -> ScriptEngineParser("kts", this, configuration.arguments)
         }
         return parser!!
     }

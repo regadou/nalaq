@@ -1,0 +1,20 @@
+<title>NaLaQ Download Page</title>
+<h1 style="text-align:center">NaLaQ Download Page</h1>
+<div>From here you can download and install the NaLaQ executable as well as all language files if desired</div>
+<div id="install">Just execute the following in a terminal: </div>
+<div>
+    Installation requirements:
+    <ul>
+        <li>a computer running Linux (not tested on anything else)</li>
+        <li>a JVM installed (minimum JRE 11)</li>
+        <li>curl command line to download needed files</li>
+        <li>a python 3 installation with pip3 (for language scripts)</li>
+        <li>unzip command line tool to unzip the vosk models</li>
+        <li>git for installing some apps from their repositories</li>
+        <li>sudo access to install executable in /usr/local/bin and service starting at boot</li>
+    </ul>
+</div>
+<script>
+document.querySelector("#install").innerHTML += "curl -sLf "+document.URL+"install-nalaq.sh|bash -s "+document.URL
+</script>
+<noscript>You need Javascript activated to view the command to run in your terminal</noscript>

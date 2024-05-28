@@ -37,6 +37,10 @@ class TranslateParser(): com.magicreg.nalaq.Parser {
         val result =translateEndpoint!!.post(data, mapOf("content-type" to "application/json"))
         return toMap(result)["translatedText"]?.toString() ?: result.toString()
     }
+
+    override fun toString(): String {
+        return "TranslateParser"
+    }
 }
 
 class NlpParser(
@@ -53,6 +57,10 @@ class NlpParser(
         if (!lazyLoading) {
             checkDependencies()
         }
+    }
+
+    override fun toString(): String {
+        return "NlpParser"
     }
 
     override fun parse(txt: String): Expression {
