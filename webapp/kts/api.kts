@@ -13,6 +13,7 @@ fun translate(text: String, src: String, dst: String): String {
 }
 
 mapOf<String,Any?>(
+    "/languages" to ::getLanguages,
     "/nalaq" to ::nalaq,
     "/kotlin" to ::kotlin,
     "/translate" to ::translate

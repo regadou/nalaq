@@ -9,10 +9,10 @@ function init() {
 async function loadLanguages() {
     var lang1 = document.querySelector("#lang1select")
     var lang2 = document.querySelector("#lang2select")
-    const langs = await fetch(document.URL, {
+    const langs = await fetch("/languages", {
         method: 'POST',
-        headers: {'Content-Type': 'text/x-kotlin', 'Accept': 'application/json'},
-        body: "getLanguages()"
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        body: "null"
     }).then(r => r.json()).catch(e => alert(e))
     for (const lang of langs) {
         languages[lang.code] = lang
@@ -127,11 +127,10 @@ async function translateText(lang) {
 }
 
 async function translationRequest(txt, src, dst) {
-    var code = JSON.stringify(txt)+'.translate('+JSON.stringify(src)+','+JSON.stringify(dst)+')'
-    return (await fetch(document.URL, {
+    return (await fetch("/translate?src="+src+"&dst="+dst, {
         method: 'POST',
-        headers: {'Content-Type': 'text/x-kotlin', 'Accept': 'text/plain'},
-        body: code
+        headers: {'Content-Type': 'application/json', 'Accept': 'text/plain'},
+        body: JSON.stringify({text:txt})
     }).then(r => r.text()).catch(e => alert(e)))
 }
 
