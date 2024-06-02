@@ -36,14 +36,16 @@ enum class CompareOperator(val symbol: String, val function: KFunction<Any?>) {
     MATCH("~", ::match_func), NOT_MATCH("!~", ::not_match_func)
 }
 enum class LogicOperator { OR, AND }
-enum class TextParser { NALAQ, NLP, TRANSLATE, KOTLIN }
 enum class UriMethod { GET, POST, PUT, DELETE }
+enum class DataLevel { NOTHING, NUMBER, FUNCTION, ENTITY, COLLECTION, TEXT, VIEW }
+enum class TextParser { NALAQ, NLP, TRANSLATE, KOTLIN, JSON, YAML }
 
 data class Configuration(
     val consolePrompt: String? = null,
     val resultPrompt: String? = null,
     val expressionPrompt: String? = null,
     val printConfig: Boolean = false,
+    val remoteScripting: Boolean = false,
     val outputFormat: String? = null,
     val language: String = Locale.getDefault().language,
     val targetLanguage: String? = null,
@@ -55,6 +57,7 @@ data class Configuration(
     val serverPort: Int? = null,
     val namespaces: Map<String,URI> = emptyMap(),
     val webFolder: String = System.getProperty("user.dir"),
+    val webApi : URI? = null,
     val startMethod: String? = null,
     val executeExpression: String? = null,
     val arguments: List<String> = emptyList()
@@ -126,6 +129,14 @@ interface Namespace: Filterable {
 
     override fun filter(filter: Filter): List<Any?> {
         return filter.filter(names.map { value(it) })
+    }
+
+    fun toMap(): MutableMap<String,Any?> {
+        return MapAdapter(
+            { this.names.toSet() },
+            { this.value(toString(it)) },
+            if (this.readOnly) { k, _ -> this.value(toString(k))} else { k, v -> this.setValue(toString(k), v) }
+        )
     }
 }
 
@@ -243,6 +254,14 @@ fun Any?.type(): Type {
     return getTypeByClass(if (this == null) Void::class else this::class)
 }
 
+fun Any?.dataLevel(): DataLevel {
+    val any = anyType()
+    var type = this.type()
+    while (type.parentType != any)
+        type = type.parentType
+    return if (type == any) DataLevel.ENTITY else DataLevel.valueOf(type.name.uppercase())
+}
+
 fun Any?.resolve(deepResolving: Boolean = false): Any? {
     if (this is Expression)
         return this.value().resolve()
@@ -347,6 +366,10 @@ fun Any?.toText(): String {
             return ByteArray(this.size){array[it]}.toString(Charset.forName("utf8"))
         }
     }
+    if (this is InputStream)
+        return this.readBytes().toString(Charset.forName("utf8"))
+    if (this is Reader)
+        return this.readText()
     if (this.isIterable())
         return "("+this.toIterator()!!.asSequence().joinToString(","){it.toText()}+")"
     if (this.isMappable())
@@ -442,9 +465,7 @@ fun Any?.toMap(): Map<Any?,Any?>? {
     if (this is Map<*,*>)
         return this as Map<Any?,Any?>
     if (this is Namespace)
-        return MapAdapter({ this.names.toSet() },
-            { this.value(toString(it)) },
-            if (this.readOnly) { k, _ -> this.value(toString(k))} else { k, v -> this.setValue(toString(k), v) })
+        return this.toMap() as Map<Any?,Any?>
     if (this is Resource)
         return MapAdapter({ this.properties.map{ it.name }.toSet() },
             { k -> this.properties.firstOrNull{it.name == k}?.getValue(this) },
@@ -735,19 +756,11 @@ fun String.toJvmObject(): AnnotatedElement? {
 }
 
 fun String.toExpression(): Expression {
-    return getContext().getParser().parse(this)
+    return getParser(getContext().configuration.textParser).parse(this)
 }
 
 fun String.translate(srclang: String, dstlang: String): String {
-    return TranslateParser().translate(srclang, dstlang, this)
-}
-
-fun String.speak(lang: String): AudioStream {
-    throw RuntimeException("String.speak not implemented yet")
-}
-
-fun AudioStream.speech(lang: String): String {
-    throw RuntimeException("AudioStream.speech not implemented yet")
+    return (getParser(TextParser.TRANSLATE) as TranslateParser).translate(srclang, dstlang, this)
 }
 
 fun Number.toBytes(): ByteArray {

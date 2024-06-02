@@ -346,7 +346,7 @@ private fun indexAllBuiltinTypes(): MutableMap<String, Type> {
     addType("binary", CharSequence::class, listOf(ByteArray::class), ::toByteArray)
     addType("input", CharSequence::class, listOf(InputStream::class, Reader::class), ::toInputStream)
     addType("output", CharSequence::class, listOf(OutputStream::class, Writer::class), ::toOutputStream)
-    addType("speech", Reader::class, listOf(SpeechReader::class), ::toSpeechReader)
+    addType("speech", InputStream::class, listOf(SpeechReader::class), ::toSpeechReader)
     addType("expression", CharSequence::class, listOf(Expression::class, Filter::class), ::toExpression)
     addType("document", View::class, listOf(Element::class))
     addType("image", View::class, listOf(Image::class))

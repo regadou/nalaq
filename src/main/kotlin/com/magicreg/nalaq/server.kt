@@ -14,14 +14,17 @@ import java.io.*
 import java.net.URI
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import kotlin.reflect.KFunction
+import kotlin.reflect.KParameter
 
 fun startServer(config: Configuration) {
-    val topContext = getContext()
     if (config.serverPort == null || config.serverPort < 1)
         throw RuntimeException("Invalid server port: ${config.serverPort}")
+    val topContext = getContext()
+    val api = (config.webApi?.get()?.resolve()?.toMap() ?: emptyMap()) as Map<String,Any?>
     embeddedServer(Netty, port = config.serverPort) {
         install(Sessions) {cookie<WebSession>("WEB_SESSION", storage = SessionStorageMemory())}
-        routing {route("/{path...}") {handle{ processRequest(topContext, call)}}}
+        routing {route("/{path...}") {handle{ processRequest(topContext, api, call)}}}
         println("Server listening on port ${config.serverPort}...")
     }.start(true)
 }
@@ -42,7 +45,7 @@ data class WebSession(val id: String)
 data class ResponseData(val status: Int?, val type: String, val data: Any?)
 data class HttpRequest(
     val host: String,
-    val method: String,
+    val method: UriMethod,
     val path: String,
     val version: String,
     val query: Map<String,Any>,
@@ -73,13 +76,13 @@ private const val DEBUG = true
 private const val DEFAULT_MIMETYPE = "text/html"
 private const val JSON_MIMETYPE = "application/json"
 private val INDEX_TYPES = arrayOf("html", "htm", "json", "txt", "kts", "nalaq", "nlq")
-private val METHODS_WITH_BODY = arrayOf("POST", "PUT")
+private val METHODS_WITH_BODY = arrayOf(UriMethod.POST, UriMethod.PUT)
 private val INTERNAL_SERVER_ERROR = HttpStatusCode(StatusCode_InternalServerError, "Internal Server Error")
 
-private suspend fun processRequest(topcx: Context, call: ApplicationCall) {
+private suspend fun processRequest(topcx: Context, api: Map<String,Any?>, call: ApplicationCall) {
     val webcx = getSessionContext(call, topcx)
     try {
-        val method = call.request.httpMethod.value.uppercase()
+        val method = UriMethod.valueOf(call.request.httpMethod.value.uppercase())
         val inputStream = if (METHODS_WITH_BODY.contains(method)) call.receiveStream() else null
         val request =  HttpRequest(
             call.request.host(),
@@ -90,7 +93,7 @@ private suspend fun processRequest(topcx: Context, call: ApplicationCall) {
             getMap(call.request.headers, true),
             call.request.origin.remoteAddress,
             inputStream)
-        val data = httpRequest(webcx, request)
+        val data = httpRequest(webcx, api, request)
         val parts = data.type.split("/")
         val contentType = ContentType(parts[0], parts[1], listOf(HeaderValueParam("charset", "utf8")))
         val status = HttpStatusCode.fromValue(data.status ?: StatusCode_OK)
@@ -114,15 +117,50 @@ private suspend fun processRequest(topcx: Context, call: ApplicationCall) {
     webcx.close(false)
 }
 
-private fun httpRequest(cx: Context, request: HttpRequest): ResponseData {
+private fun httpRequest(cx: Context, api: Map<String,Any?>, request: HttpRequest): ResponseData {
     logRequest(request.method, request.path, request.remoteHost)
+    val service = api[request.path]
+    if (service != null)
+        return apiRequest(service, request)
     return when (request.method) {
-        "GET" -> getRequest(cx, request)
-        "POST" -> postRequest(cx, request)
-        "PUT" -> putRequest(cx, request)
-        "DELETE" -> deleteRequest(cx, request)
-        else -> ResponseData(StatusCode_MethodNotAllowed, DEFAULT_MIMETYPE, "")
+        UriMethod.GET -> getRequest(cx, request)
+        UriMethod.POST -> postRequest(cx, request)
+        UriMethod.PUT -> putRequest(cx, request)
+        UriMethod.DELETE -> deleteRequest(cx, request)
     }
+}
+
+private fun apiRequest(service: Any?, request: HttpRequest): ResponseData {
+    val value = when (request.method) {
+        UriMethod.GET -> service
+        UriMethod.PUT,
+        UriMethod.DELETE -> return ResponseData(StatusCode_MethodNotAllowed, DEFAULT_MIMETYPE, "")
+        UriMethod.POST -> when (service.dataLevel()) {
+            DataLevel.NOTHING -> return ResponseData(StatusCode_NotFound, DEFAULT_MIMETYPE, "${request.path} not found")
+            DataLevel.NUMBER -> toDouble(service) + toDouble(requestBody(request))
+            DataLevel.FUNCTION -> executeFunction(toFunction(service), request.query, requestBody(request))
+            DataLevel.ENTITY -> {
+                val map = mutableMapOf<Any?,Any?>()
+                map.putAll(toMap(service))
+                for (item in toCollection(requestBody(request)))
+                    map.putAll(toMap(item))
+                map
+            }
+            DataLevel.COLLECTION -> {
+                val list = mutableListOf<Any?>()
+                list.addAll(toCollection(service))
+                list.addAll(toCollection(requestBody(request)))
+                list
+            }
+            DataLevel.TEXT -> service.toText() + requestBody(request).toText()
+            DataLevel.VIEW -> return ResponseData(StatusCode_NotImplemented, DEFAULT_MIMETYPE, "API for views not implemented yet")
+        }
+    }
+
+    val buffer = ByteArrayOutputStream()
+    val type = contentNegotiation(request)
+    getFormat(type)!!.encode(value.resolve(), buffer, defaultCharset())
+    return ResponseData(StatusCode_OK, type, buffer.toByteArray())
 }
 
 private fun getRequest(cx: Context, request: HttpRequest): ResponseData {
@@ -185,7 +223,7 @@ private fun putRequest(cx: Context, request: HttpRequest): ResponseData {
     val baseuri = cx.configuration.webFolder ?: "."
     val filename = request.path
     val file = File(baseuri+filename)
-    if (file.exists()) {
+    if (file.exists() || file.parentFile.exists()) {
         if (file.isDirectory)
             return ResponseData(StatusCode_BadRequest, DEFAULT_MIMETYPE, "Cannot add content to $filename")
         // TODO: add script support or overwrite file or block from overwriting file
@@ -239,7 +277,7 @@ private fun getMap(values: StringValues, normalize: Boolean): Map<String,Any> {
     return map
 }
 
-private fun logRequest(method: String, uri: String, remote: String) {
+private fun logRequest(method: UriMethod, uri: String, remote: String) {
     println(printTime(System.currentTimeMillis())+" "+remote+" "+method+" "+uri)
 }
 
@@ -264,11 +302,13 @@ private fun printLinks(links: Array<String>, prefix: String, baseuri: String, qu
 }
 
 private fun executeScript(cx: Context, request: HttpRequest, file: File): ResponseData? {
-    val contentType = if (request.method == "GET") null else request.headers["content-type"]?.toString()
+    val contentType = if (request.method == UriMethod.GET) null else request.headers["content-type"]?.toString()
     val type = detectFileType(file.toString()) ?: contentType ?: return null
     val format = getScriptingFormat(type, contentType) ?: return null
     if (!format.scripting)
         return null
+    if (!cx.configuration.remoteScripting)
+        return ResponseData(StatusCode_MethodNotAllowed, DEFAULT_MIMETYPE, "${format.mimetype} execution not allowed")
     if (!format.supported)
         return ResponseData(StatusCode_NotImplemented, DEFAULT_MIMETYPE, "${format.mimetype} execution not implemented")
     val code = if (format.mimetype == contentType) request.inputStream?.readAllBytes().toText() else file.readText()
@@ -305,9 +345,47 @@ private fun contentNegotiation(request: HttpRequest): String {
             if (type.isEmpty() || type.startsWith("q="))
                 continue
             val format = getFormat(type)
-            if (format != null && format.supported)
+            if (format != null && format.supported && !format.scripting)
                 return format.mimetype
         }
     }
     return DEFAULT_MIMETYPE
+}
+
+private fun executeFunction(function: KFunction<Any?>, query: Map<String,Any?>, body: Any?): Any? {
+    if (query.isEmpty())
+        return function.execute(toList(body))
+    val args = mergeRequestData(query, body)
+    val params = mutableMapOf<KParameter,Any?>()
+    for ((index, key) in args.keys.withIndex())
+        params[function.parameters.firstOrNull { it.name == key } ?: function.parameters[index] ] = args[key]
+    return function.callBy(params)
+}
+
+private fun requestBody(request: HttpRequest): Any? {
+    if (request.inputStream == null)
+        return null
+    val parts = (request.headers["content-type"]?.toString() ?: DEFAULT_MIMETYPE).split(";")
+    val mimetype = parts[0].trim()
+    val charset = parts.firstOrNull { it.contains("charset=")}?.split("=")?.get(1)?.trim() ?: defaultCharset()
+    return getFormat(mimetype)!!.decode(request.inputStream, charset)
+}
+
+private fun mergeRequestData(query: Map<String,Any?>, body: Any?): Map<String,Any?> {
+    val params = mutableMapOf<String, Any?>()
+    params.putAll(query)
+    for (item in bodyToList(body))
+        params.putAll(toMap(item) as Map<String,Any?>)
+    return params
+}
+
+private fun bodyToList(body: Any?): List<Any?> {
+    return if (body is Collection<*>)
+        body.toList()
+    else if (body is Array<*>)
+        body.toList()
+    else if (body != null)
+        listOf(body)
+    else
+        emptyList()
 }

@@ -10,7 +10,9 @@ fi
 config="---
 serverPort: 7777
 webFolder: webapp
+webApi: ./webapp/kts/api.kts
 startMethod: server
+remoteScripting: true
 speechModelsFolder: $models
 translateEndpoint: http://localhost:5000/translate
 voiceCommand: glowspeak

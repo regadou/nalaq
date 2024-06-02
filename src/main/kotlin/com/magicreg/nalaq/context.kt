@@ -28,7 +28,6 @@ fun getContext(vararg values: Any): Context {
 
     var name: String? = null
     var parent: Context? = null
-    var parser: Parser? = null
     var constants: Namespace? = null
     var variables: Namespace? = null
     var config: Configuration? = null
@@ -49,8 +48,6 @@ fun getContext(vararg values: Any): Context {
         }
         else if (value is Configuration)
             config = value
-        else if (value is Parser)
-            parser = value
         else if (value is MutableMap<*,*>)
             variables = GenericNamespace(readOnly = false).populate(value as MutableMap<String,Any?>)
         else if (value is Map<*,*>)
@@ -67,7 +64,7 @@ fun getContext(vararg values: Any): Context {
         name = randomName()
     if (uri == null)
         uri = File(System.getProperty("user.dir")).toURI()
-    val cx = Context(name!!, uri!!.toString(), parent, parser, constants ?: GenericNamespace(readOnly=true), variables ?: GenericNamespace(), config)
+    val cx = Context(name!!, uri!!.toString(), parent, constants ?: GenericNamespace(readOnly=true), variables ?: GenericNamespace(), config)
     CURRENT_CONTEXT.set(cx)
     return cx
 }
@@ -76,7 +73,6 @@ class Context(
     val name: String,
     override val uri: String,
     private val parent: Context?,
-    private var parser: Parser?,
     private val constants: Namespace,
     private val variables: Namespace,
     private var localConfiguration: Configuration?
@@ -97,7 +93,7 @@ class Context(
     fun childContext(childName: String?, constants: Namespace, uri: String = this.uri): Context {
         if (CURRENT_CONTEXT.get() != this)
             throw RuntimeException("This context is not the current thread context")
-        val cx = Context(childName ?: name+"/"+randomName(), uri, this, null, constants, GenericNamespace(), null)
+        val cx = Context(childName ?: name+"/"+randomName(), uri, this, constants, GenericNamespace(), null)
         CURRENT_CONTEXT.set(parent)
         return cx
     }
@@ -173,24 +169,6 @@ class Context(
         if (parent != null)
             result.addAll(parent.valueKeys(value))
         return result.sorted()
-    }
-
-    fun getParser(): Parser {
-        if (parser != null)
-            return parser!!
-        var p = parent
-        while (p != null) {
-            if (p.parser != null)
-                return p.parser!!
-            p = p.parent
-        }
-        parser = when (configuration.textParser) {
-            TextParser.NALAQ -> GenericParser()
-            TextParser.NLP -> NlpParser(configuration.nlpModelsFolder ?: throw RuntimeException("NLP model folder was not specified"))
-            TextParser.TRANSLATE -> TranslateParser()
-            TextParser.KOTLIN -> ScriptEngineParser("kts", this, configuration.arguments)
-        }
-        return parser!!
     }
 
     fun parentFolder(): String {

@@ -95,7 +95,7 @@ class RdfFormat(val syntax: RDFFormat, override val mimetype: String) : Format {
     }
 
     override fun toString(): String {
-        return "Format<$mimetype>(${extensions.joinToString(",")})"
+        return "Format($mimetype)"
     }
 }
 

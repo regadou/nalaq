@@ -76,7 +76,7 @@ class GenericFormat(
     }
 
     override fun toString(): String {
-        return "Format<$mimetype>(${extensions.joinToString(",")})"
+        return "Format($mimetype)"
     }
 }
 
@@ -307,7 +307,7 @@ private fun encodeNalaq(value: Any?, output: OutputStream, charset: String) {
 }
 
 private fun decodeKotlin(input: InputStream, charset: String): Any? {
-    return ScriptEngineParser("kts", getContext(), emptyList()).parse(input.readAllBytes().toString(Charset.forName(charset)))
+    return getParser(TextParser.KOTLIN).parse(input.readAllBytes().toString(Charset.forName(charset)))
 }
 
 private fun encodeKotlin(value: Any?, output: OutputStream, charset: String) {

@@ -12,36 +12,8 @@ import opennlp.tools.util.Span
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
-import java.net.URI
 import java.util.*
 import kotlin.reflect.KFunction
-
-class TranslateParser(): com.magicreg.nalaq.Parser {
-    private var translateEndpoint: URI? = null
-
-    override fun parse(txt: String): Expression {
-        val config = getContext().configuration
-        val result = if (config.targetLanguage.isNullOrBlank()) txt else translate(config.language, config.targetLanguage, txt)
-        return Expression(null, listOf(result))
-    }
-
-    fun translate(sourceLang: String, targetLang: String, text: String ): String {
-        val data = mapOf(
-            "source" to sourceLang,
-            "target" to targetLang,
-            "format" to "text",
-            "q" to text
-        )
-        if (translateEndpoint == null)
-            translateEndpoint = getContext().configuration.translateEndpoint ?: throw RuntimeException("translateEndpoint is not configured")
-        val result =translateEndpoint!!.post(data, mapOf("content-type" to "application/json"))
-        return toMap(result)["translatedText"]?.toString() ?: result.toString()
-    }
-
-    override fun toString(): String {
-        return "TranslateParser"
-    }
-}
 
 class NlpParser(
     private val modelFolder: String,

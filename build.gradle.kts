@@ -1,6 +1,6 @@
 plugins {
     application
-    kotlin("jvm") version "1.9.23"
+    kotlin("jvm") version "1.9.24"
     id("io.ktor.plugin") version "2.3.9"
     id("maven-publish")
 }
@@ -45,6 +45,7 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.12.3")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.12.3")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.12.3")
+    implementation("io.github.jamsesso:json-logic-java:1.0.7")
     implementation("org.apache.commons:commons-csv:1.10.0")
     implementation("org.jsoup:jsoup:1.11.3")
     implementation("com.googlecode.ez-vcard:ez-vcard:0.12.1")

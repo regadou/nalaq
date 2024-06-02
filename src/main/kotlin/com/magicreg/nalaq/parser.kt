@@ -1,20 +1,72 @@
 package com.magicreg.nalaq
 
+import io.github.jamsesso.jsonlogic.JsonLogic
 import java.net.URI
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 
-fun compileTokens(vararg tokens: Any?): Expression {
-    if (tokens.isEmpty())
-        return Expression(null, emptyList())
-    for (token in tokens) {
-        if (token !is List<*>)
-            return compileTokens(LineStatus(tokens.toList()), true)
+fun getParser(textParser: TextParser): Parser {
+    val parser = PARSERS_MAP[textParser]
+    if (parser != null)
+        return parser
+    PARSERS_MAP[textParser] = when (textParser) {
+        TextParser.NALAQ -> GenericParser()
+        TextParser.NLP -> NlpParser(getContext().configuration.nlpModelsFolder ?: throw RuntimeException("NLP model folder was not specified"))
+        TextParser.TRANSLATE -> TranslateParser()
+        TextParser.KOTLIN -> ScriptEngineParser("kts")
+        TextParser.JSON -> LogicParser(JsonLogic(), getFormat("application/json")!!)
+        TextParser.YAML -> LogicParser(JsonLogic(), getFormat("application/yaml")!!)
     }
-    return compileExpressions(ParserStatus(tokens.toList() as List<List<Any?>>), true)
+    return PARSERS_MAP[textParser]!!
 }
 
-class GenericParser(): Parser {
+class TranslateParser: Parser {
+    private var translateEndpoint: URI? = null
+
+    override fun parse(txt: String): Expression {
+        val config = getContext().configuration
+        val result = if (config.targetLanguage.isNullOrBlank()) txt else translate(config.language, config.targetLanguage, txt)
+        return Expression(null, listOf(result))
+    }
+
+    fun translate(sourceLang: String, targetLang: String, text: String ): String {
+        val data = mapOf(
+            "source" to sourceLang,
+            "target" to targetLang,
+            "format" to "text",
+            "q" to text
+        )
+        if (translateEndpoint == null)
+            translateEndpoint = getContext().configuration.translateEndpoint ?: throw RuntimeException("translateEndpoint is not configured")
+        val result =translateEndpoint!!.post(data, mapOf("content-type" to "application/json"))
+        return toMap(result)["translatedText"]?.toString() ?: result.toString()
+    }
+
+    override fun toString(): String {
+        return "TranslateParser"
+    }
+}
+
+class LogicParser(private val logic: JsonLogic, private val format: Format): Parser {
+    private val json = if (format.mimetype == "application/json") format else getFormat("application/json")!!
+
+    override fun parse(txt: String): Expression {
+        return Expression(::applyLogic, listOf(format.decodeText(txt)))
+    }
+
+    fun applyLogic(args: List<Any?>): Any? {
+        var value: Any? = null
+        for (arg in args)
+            value = logic.apply(json.encodeText(arg), getContext().toMap())
+        return value
+    }
+
+    override fun toString(): String {
+        return "LogicParser(${format.mimetype})"
+    }
+}
+
+class GenericParser: Parser {
     override fun parse(txt: String): Expression {
         val tokens = parseText(txt)
         if (tokens.isEmpty())
@@ -29,6 +81,10 @@ class GenericParser(): Parser {
         return "GenericParser"
     }
 }
+
+private val FUNCTION_TYPE = getTypeByClass(KFunction::class)
+private val BLANK_NON_ASCII = '\u007F'..'\u00AD'
+private val PARSERS_MAP = mutableMapOf<TextParser,Parser>()
 
 private class ParserStatus(
     val lines: List<List<Any?>>,
@@ -249,6 +305,3 @@ private fun findEntity(items: MutableList<Any?>): Expression? {
 private fun createJvmExpression(klass: Class<*>, items: MutableList<Any?>, index: Int): Expression? {
     return null // TODO: call java.beans.Expression
 }
-
-val FUNCTION_TYPE = getTypeByClass(KFunction::class)
-val BLANK_NON_ASCII = '\u007F'..'\u00AD'

@@ -78,6 +78,7 @@ fun loadConfiguration(args: Array<String>): Configuration? {
         resultPrompt = if (configData.containsKey("resultPrompt")) configData["resultPrompt"]?.toString() else defaultResultPrompt,
         expressionPrompt = if (configData.containsKey("expressionPrompt")) configData["expressionPrompt"]?.toString() else defaultExpressionPrompt,
         printConfig = toBoolean(configData["printConfig"]),
+        remoteScripting = toBoolean(configData["remoteScripting"]),
         outputFormat = configData["outputFormat"]?.toString(),
         language = configData["language"]?.toString() ?: Locale.getDefault().language,
         targetLanguage = configData["targetLanguage"]?.toString(),
@@ -89,6 +90,7 @@ fun loadConfiguration(args: Array<String>): Configuration? {
         serverPort = configData["serverPort"]?.toString()?.toIntOrNull(),
         namespaces = getMapUris(configData["namespaces"], ::loadNamespace),
         webFolder = configData["webFolder"]?.toString() ?: defaultWebFolder,
+        webApi = configData["webApi"]?.toUri(),
         startMethod =  configData["startMethod"]?.toString() ?: start,
         executeExpression = exp ?: configData["executeExpression"]?.toString(),
         arguments = arguments
@@ -106,6 +108,7 @@ fun defaultConfiguration(args: Array<String> = emptyArray(), debug: Boolean = fa
         resultPrompt = if (exp == null || debug) defaultResultPrompt else if (lineCount == 1) "" else null,
         expressionPrompt = if (debug) defaultExpressionPrompt else null,
         printConfig = debug,
+        remoteScripting = false,
         outputFormat = null,
         language = Locale.getDefault().language,
         targetLanguage = null,
@@ -117,6 +120,7 @@ fun defaultConfiguration(args: Array<String> = emptyArray(), debug: Boolean = fa
         serverPort = port,
         namespaces = emptyMap(),
         webFolder = defaultWebFolder,
+        webApi = null,
         startMethod = if (exp != null) "expression" else if (port > 0) "server" else null,
         executeExpression = exp,
         arguments = arguments
@@ -127,6 +131,10 @@ fun defaultCharset(charset: String? = null): String {
     if (charset != null)
         defaultCharset = charset
     return defaultCharset
+}
+
+fun getLanguages(): Collection<Language> {
+    return languages.values
 }
 
 fun getLanguage(code: String): Language? {

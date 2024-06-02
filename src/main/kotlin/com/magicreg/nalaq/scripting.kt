@@ -1,16 +1,37 @@
 package com.magicreg.nalaq
 
+import java.time.LocalDateTime
 import javax.script.Bindings
 import javax.script.ScriptEngine
 import javax.script.ScriptEngineManager
 
-class ScriptEngineParser(id: String, val context: Context, val arguments: List<String>): Parser {
-    val engine: ScriptEngine = getScriptEngine(id)
-    val bindings = ContextBindings(context)
-    init {
-        val txtArgs = '"'+arguments.joinToString("\",\"")+'"'
-        val initScript = initCodeMap[engine.factory.engineName]?.replace("{arguments}", txtArgs)
-        engine.eval(initScript, bindings)
+class ScriptEngineParser(private val id: String): Parser {
+    private var inited = false
+    private var lastEngine: ScriptEngine = getScriptEngine(id)
+    private val memoryLeak: Boolean = lastEngine.factory.engineName == "kotlin"
+    private var renewCountdown = INITIAL_COUNTDOWN
+    val engine: ScriptEngine get() {
+        if (memoryLeak) {
+            renewCountdown--
+            if (renewCountdown <= 0) {
+                println("renewing script engine for $id at ${LocalDateTime.now()}")
+                lastEngine = getScriptEngine(id)
+                System.gc()
+                val rt = Runtime.getRuntime()
+                println("memory: ${gb(rt.freeMemory())}/${gb(rt.totalMemory())}/${gb(rt.maxMemory())}")
+                renewCountdown = INITIAL_COUNTDOWN
+            }
+        }
+        return lastEngine
+    }
+
+    fun checkInit(bindings: Bindings) {
+        if (inited)
+            return
+        inited = true
+        val text = initCodeMap[engine.factory.engineName]!!
+        println("init: $text")
+        engine.eval(text, bindings)
     }
 
     override fun parse(text: String): Expression {
@@ -18,7 +39,7 @@ class ScriptEngineParser(id: String, val context: Context, val arguments: List<S
     }
 
     override fun toString(): String {
-        return engine.factory.engineName
+        return "ScriptEngineParser(${engine.factory.engineName})"
     }
 }
 
@@ -35,7 +56,8 @@ class ContextBindings(private val cx: Context): Bindings, AbstractMap<String,Any
     }
 
     override fun putAll(from: Map<out String, Any?>) {
-        TODO("Not yet implemented")
+        for (entry in from.entries)
+            put(entry.key, entry.value)
     }
 
     override fun remove(key: String): Any? {
@@ -59,15 +81,23 @@ class ContextBindings(private val cx: Context): Bindings, AbstractMap<String,Any
 }
 
 fun scriptExecutor(parser: ScriptEngineParser, text: String): Any? {
-    return parser.engine.eval(text, parser.bindings)
+    val bindings = ContextBindings(getContext())
+    parser.checkInit(bindings)
+    println("eval: $text")
+    return parser.engine.eval(text, bindings)
 }
 
+private const val INITIAL_COUNTDOWN = 1
 private val MANAGER = ScriptEngineManager()
 private val initCodeMap = mapOf(
-    "kotlin" to "import com.magicreg.nalaq.*; import java.io.*; import java.net.*; val args=listOf({arguments})"
+    "kotlin" to "import com.magicreg.nalaq.*; import java.io.*; import java.net.*;"
 )
 
 private fun getScriptEngine(name: String): ScriptEngine {
     return MANAGER.getEngineByName(name) ?: MANAGER.getEngineByExtension(name) ?: MANAGER.getEngineByMimeType(name)
                                          ?: throw RuntimeException("Unknown script engine: $name")
+}
+
+private fun gb(n: Long): String {
+    return "${Math.round(n/1e6)}GB"
 }

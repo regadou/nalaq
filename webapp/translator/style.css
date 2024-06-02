@@ -51,13 +51,3 @@ textarea {
     color: #222222;
     background-color: #999999;
 }
-
-table {
-    border: 1px solid grey;
-}
-
-th, td {
-    border: 1px solid grey;
-    resize: both;
-    overflow: auto
-}

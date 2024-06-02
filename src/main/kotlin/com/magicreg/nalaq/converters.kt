@@ -513,7 +513,7 @@ fun toExpression(value: Any?): Expression {
         return Filter().mapCondition(value.toMap()!!.mapKeys{it.toText()}).toExpression()
     val iterator = value.toIterator()
     if (iterator != null)
-        return compileTokens(*toList(value).toTypedArray())
+        return toList(value).joinToString(" ").toExpression()
     return Expression(null, listOf(value))
 }
 

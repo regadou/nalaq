@@ -4,7 +4,6 @@ import eu.maxschuster.dataurl.DataUrl
 import eu.maxschuster.dataurl.DataUrlSerializer
 import java.io.*
 import java.net.URI
-import java.net.URLDecoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -37,7 +36,6 @@ fun resolveUri(uri: URI, method: UriMethod, headers: Map<String,String>, body: A
             "file" -> getFile(url.path)
             "data" -> decodeData(url.toString())
             "jdbc" -> try { Database(url.toString()) } catch (e: Exception) {e}
-            "nalaq" -> getNalaqValue(url.toString(), url.query, url.fragment)
             "geo" -> GeoLocation(url)
             "sftp" -> RuntimeException("Uri scheme not implemented yet for GET: ${url.scheme}")
             // TODO: mailto and sip could do contact search, check mailbox, voicemail, messages, log history, ...
@@ -78,18 +76,8 @@ fun resolveUri(uri: URI, method: UriMethod, headers: Map<String,String>, body: A
 private const val TEXT_FORMAT = "text/plain"
 private const val DATA_FORMAT = "application/json"
 private const val CONTENT_TYPE_HEADER = "content-type"
-private val URI_SCHEMES = "http,https,file,data,geo,nalaq,jdbc,sftp,mailto,sip".split(",")
+private val URI_SCHEMES = "http,https,file,data,geo,jdbc,sftp,mailto,sip".split(",")
 private val DATA_SERIALIZER = DataUrlSerializer()
-
-private fun getNalaqValue(uri: String, query: String?, fragment: String?): Any? {
-    val txt = URLDecoder.decode(uri.substring(uri.indexOf(":")+1).split("#")[0].split("?")[0], defaultCharset())
-    var value = txt.toExpression().resolve()
-    if (!query.isNullOrBlank())
-        value = toFilter(getFormat("form")!!.decodeText(query)).filter(value).simplify().resolve()
-    if (!fragment.isNullOrBlank())
-        value = value.type().property(fragment, value).getValue(value).resolve()
-    return value
-}
 
 private fun httpRequest(method: String, uri: URI, headers: Map<String,String>, value: Any? = null): Any? {
     val requestBuilder = HttpRequest.newBuilder().uri(uri)
