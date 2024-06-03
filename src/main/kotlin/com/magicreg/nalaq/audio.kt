@@ -78,7 +78,7 @@ class SpeechReader(val language: String, val audioStream: AudioInputStream): Rea
     }
 }
 
-class SpeechWriter(language: String, voiceCommandTemplate: String): Writer() {
+class SpeechWriter(language: String, voiceCommandTemplate: String, val audioStream: AudioStream? = null): Writer() {
     private val voiceCommand = createVoiceCommand(language, voiceCommandTemplate)
     private val bufferSize = 1024
     private val buffer = ByteArray(bufferSize)
@@ -96,6 +96,10 @@ class SpeechWriter(language: String, voiceCommandTemplate: String): Writer() {
     override fun write(cbuf: CharArray, off: Int, len: Int) {
         val text = String(if (off == 0 && len == cbuf.size) cbuf else CharArray(len) { cbuf[off+it] })
         val input = audioInputStream(text)
+        if (audioStream != null) {
+            audioStream.inputAudio(input)
+            return
+        }
         val speakers = AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, input.format)) as SourceDataLine
         speakers.open(input.format)
         speakers.start()
@@ -211,7 +215,7 @@ class AudioType(val type: AudioFileFormat.Type): Format {
     }
 
     override fun toString(): String {
-        return "Format<$mimetype>(${extensions.joinToString(",")})"
+        return "Format($mimetype)"
     }
 }
 

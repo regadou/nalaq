@@ -37,7 +37,7 @@ enum class CompareOperator(val symbol: String, val function: KFunction<Any?>) {
 }
 enum class LogicOperator { OR, AND }
 enum class UriMethod { GET, POST, PUT, DELETE }
-enum class DataLevel { NOTHING, NUMBER, FUNCTION, ENTITY, COLLECTION, TEXT, VIEW }
+enum class DataLevel { NOTHING, NUMBER, FUNCTION, ENTITY, COLLECTION, TEXT, VIEW, ALL }
 enum class TextParser { NALAQ, NLP, TRANSLATE, KOTLIN, JSON, YAML }
 
 data class Configuration(
@@ -63,7 +63,7 @@ data class Configuration(
     val arguments: List<String> = emptyList()
 )
 
-class Expression(
+data class Expression(
     val function: KFunction<Any?>? = null,
     val parameters: List<Any?> = emptyList()
 ) {

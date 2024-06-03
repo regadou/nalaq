@@ -15,7 +15,7 @@ download="download/nalaq-all.jar"
 zip="download/webapp.zip"
 
 echo "Compiling NaLaQ application ..."
-./run.sh clean dictionary || exit
+./run.sh clean all || exit
 
 echo "Building NaLaQ fat jar ..."
 gradle publishToMavenLocal || exit

@@ -132,7 +132,7 @@ private suspend fun httpRequest(cx: Context, api: Map<String,Any?>, request: Htt
     }
 }
 
-private fun apiRequest(service: Any?, request: HttpRequest): ResponseData {
+private suspend fun apiRequest(service: Any?, request: HttpRequest): ResponseData {
     val value = when (request.method) {
         UriMethod.GET -> service
         UriMethod.PUT,
@@ -156,6 +156,7 @@ private fun apiRequest(service: Any?, request: HttpRequest): ResponseData {
             }
             DataLevel.TEXT -> service.toText() + requestBody(request).toText()
             DataLevel.VIEW -> return ResponseData(StatusCode_NotImplemented, DEFAULT_MIMETYPE, "API for views not implemented yet")
+            DataLevel.ALL ->  return ResponseData(StatusCode_MethodNotAllowed, DEFAULT_MIMETYPE, "")
         }
     }
 
@@ -355,36 +356,32 @@ private fun executeFunction(function: KFunction<Any?>, query: Map<String,Any?>, 
     val args = mergeRequestData(query, body)
     val params = mutableMapOf<KParameter,Any?>()
     for ((index, key) in args.keys.withIndex())
-        params[function.parameters.firstOrNull { it.name == key } ?: function.parameters[index] ] = args[key]
+        params[function.parameters.firstOrNull { it.name == key } ?: function.parameters[index]] = args[key]
     return function.callBy(params)
 }
 
-private fun requestBody(request: HttpRequest): Any? {
+private suspend fun requestBody(request: HttpRequest): Any? {
     if (request.inputStream == null)
         return null
     val parts = (request.headers["content-type"]?.toString() ?: DEFAULT_MIMETYPE).split(";")
     val mimetype = parts[0].trim()
     val charset = parts.firstOrNull { it.contains("charset=")}?.split("=")?.get(1)?.trim() ?: defaultCharset()
-    return getFormat(mimetype)!!.decode(request.inputStream, charset)
+    val format = getFormat(mimetype) ?: throw RuntimeException("Unknown mimetype: $mimetype")
+    return withContext(Dispatchers.IO) { format.decode(request.inputStream, charset) }
 }
 
 private fun mergeRequestData(query: Map<String,Any?>, body: Any?): Map<String,Any?> {
     val params = mutableMapOf<String, Any?>()
     params.putAll(query)
-    for (item in bodyToList(body))
-        params.putAll(toMap(item) as Map<String,Any?>)
-    return params
-}
-
-private fun bodyToList(body: Any?): List<Any?> {
-    return if (body is Collection<*>)
-        body.toList()
-    else if (body is Array<*>)
-        body.toList()
-    else if (body != null)
-        listOf(body)
+    if (body is Map<*,*>)
+        params.putAll(body as Map<String,Any?>)
+    else if (body is Collection<*> || body is Array<*>) {
+        for (item in toCollection(body))
+            params["#${params.size}"] = item
+    }
     else
-        emptyList()
+        params["#${params.size}"] = body
+    return params
 }
 
 private suspend fun copyStream(input: InputStream, output: OutputStream, closeOutput: Boolean) {

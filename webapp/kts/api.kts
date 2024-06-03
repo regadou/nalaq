@@ -20,6 +20,21 @@ fun audioFormats(): List<String> {
     return formats.sorted()
 }
 
+fun speechInput(lang: String, audio: AudioStream): String {
+    val reader = BufferedReader(SpeechReader(lang, audio.audioInputStream()))
+    val line = reader.readLine() ?: ""
+    reader.close()
+    return line
+}
+
+fun speechOutput(lang: String, text: String): AudioStream {
+    val voiceCommand = getContext().configuration.voiceCommand ?: throw Exception("Text to speech is not configured: voiceCommand is null")
+    val audio = AudioStream()
+    val speaker = SpeechWriter(lang, voiceCommand)
+    audio.inputAudio(speaker.audioInputStream(text))
+    return audio
+}
+
 fun generateLinks(endpoints: List<String>): String {
     val html = mutableListOf("<html><title>NaLaQ API</title><h1 style='text-align:center'>NaLaQ API</h1>")
     for (endpoint in endpoints)
@@ -29,10 +44,12 @@ fun generateLinks(endpoints: List<String>): String {
 }
 
 mapOf<String,Any?>(
-    "/api" to generateLinks("audio,kotlin,languages,nalaq,translate".split(",")),
+    "/api" to generateLinks("audio,kotlin,languages,nalaq,speak,speech,translate".split(",")),
     "/api/audio" to ::audioFormats,
     "/api/kotlin" to ::kotlin,
     "/api/languages" to ::getLanguages,
     "/api/nalaq" to ::nalaq,
+    "/api/speak" to ::speechOutput,
+    "/api/speech" to ::speechInput,
     "/api/translate" to ::translate
 )

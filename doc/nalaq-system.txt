@@ -1,6 +1,6 @@
 - the goals behind the NaLaQ project:
   - be the last software to be programmed by programming language coding
-  - a software that can do everything that current wide-spread existing technology is capable
+  - a software able to do everything that current wide-spread existing technology is capable
   - communicate verbally with the computer to tell it what we want
   - easily automate computer tasks without needing a computer expert to intervene
   - free the people from greedy and prying technology vendors
@@ -8,17 +8,24 @@
   - the main standards are URI, HTTP, HTML, JSON and SQL
   - secondary standards like CSV, YAML, RDF, image, audio and video file formats are mapped to one of the 5 main standards
   - the same applies for file, ftp, data, mailto, geo and jdbc uri schemes
-  - the system also uses the non-standard nalaq URI scheme and text/x-nalaq file format to embed NaLaQ code into a URI or in a file
-  - the system will also use NaLaQ and ETS as uri scheme or file format to access all the universal semantics created by the system
+  - the system also uses non-standard mimetypes text/x-nalaq and text/x-kotlin to achieve runtime scripting capabilities
+  - the system will eventually use ETS as uri scheme and file format to express the universal semantics created by the system
+- the main API of the system in api.kt file:
+  - this is the main place for an overview of the system and understand how to use it
+  - in this file are defined enums, interfaces and data class used throughout the system
+  - are also defined commonly used extensions for ease of use
+  - see also main.kt file to learn how to bootstrap the system
 - the type system in type.kt file:
-  - the Type interface manages all data types, properties and instances
+  - implementations of the Type interface manages all data types, properties and instances
     - possible schema sources include JVM classes, SQL tables, RDF types, JSON schema and data files
     - automated schema extraction by scanning data in Collection<Map> format from the following data types:
       - CSV, JSON, YAML and HTML tables
-  - The Property class manages type properties
-  - the PropertyValue class manages reference to an instance property value (equivalent to RDF Statement class)
-  - the 8 data levels are defined in the createRootTypes function
-  - builtin subtypes are defined in the createSubTypes function
+  - implementations of the Property interface manages type properties
+  - implementations of the Reference interface manages relation betwen an instance, its properties and values
+    - implements the MutableMap.Entry<String,Any?> interface, adding parent and readOnly properties
+    - semantically equivalent to RDF Statement class (subject property object == parent key value)
+  - the 8 data levels are defined in the DataLevel enum with their type implementations in the CLASS_TYPE_MAP map
+  - builtin subtypes are defined in the indexAllBuiltinTypes function
   - custom types created programmatically, by importing schema source or scanning Collection<Map|String|Property|Map.Entry> data structures
     - if collection items type is string, each string must be a valid SQL column definition
     - if collection items type is map, all items must must have the same keys and the same value type (or null) for each key
@@ -81,5 +88,5 @@
 - HTTP server implemented with ktor in server.kt file:
   - dynamic routing configured by the Configuration class passed in command line arguments
   - server port, namespaces, web folder and apis endpoints can be configured
-  - if an api endpoint resolves to a function, a POST or PUT query can execute it with the request body as parameters of the function
+  - if an api endpoint resolves to a function, a POST query will execute it with the request query and body as parameters of that function
   
