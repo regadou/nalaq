@@ -1,36 +1,29 @@
 package com.magicreg.nalaq
 
-import java.time.LocalDateTime
 import javax.script.Bindings
 import javax.script.ScriptEngine
 import javax.script.ScriptEngineManager
+import kotlin.script.experimental.jsr223.KotlinJsr223DefaultScriptEngineFactory
+
+fun getScriptEngines(): List<String> {
+    val engines = mutableListOf<String>()
+    for (factory in MANAGER.engineFactories) {
+        val name = factory.engineName
+        val lang = factory.languageName
+        engines.add(if (name == lang) name else "$name($lang)")
+    }
+    return engines
+}
 
 class ScriptEngineParser(private val id: String): Parser {
     private var inited = false
-    private var lastEngine: ScriptEngine = getScriptEngine(id)
-    private val memoryLeak: Boolean = lastEngine.factory.engineName == "kotlin"
-    private var renewCountdown = INITIAL_COUNTDOWN
-    val engine: ScriptEngine get() {
-        if (memoryLeak) {
-            renewCountdown--
-            if (renewCountdown <= 0) {
-                println("renewing script engine for $id at ${LocalDateTime.now()}")
-                lastEngine = getScriptEngine(id)
-                System.gc()
-                val rt = Runtime.getRuntime()
-                println("memory: ${gb(rt.freeMemory())}/${gb(rt.totalMemory())}/${gb(rt.maxMemory())}")
-                renewCountdown = INITIAL_COUNTDOWN
-            }
-        }
-        return lastEngine
-    }
+    var engine = getScriptEngine(id)
 
     fun checkInit(bindings: Bindings) {
         if (inited)
             return
         inited = true
         val text = initCodeMap[engine.factory.engineName]!!
-        println("init: $text")
         engine.eval(text, bindings)
     }
 
@@ -83,21 +76,19 @@ class ContextBindings(private val cx: Context): Bindings, AbstractMap<String,Any
 fun scriptExecutor(parser: ScriptEngineParser, text: String): Any? {
     val bindings = ContextBindings(getContext())
     parser.checkInit(bindings)
-    println("eval: $text")
     return parser.engine.eval(text, bindings)
 }
 
-private const val INITIAL_COUNTDOWN = 1
 private val MANAGER = ScriptEngineManager()
+private val KOTLIN_NAMES = "kotlin,kts,kt,text/x-kotlin".split(",")
+private val KOTLIN_FACTORY = KotlinJsr223DefaultScriptEngineFactory()
 private val initCodeMap = mapOf(
     "kotlin" to "import com.magicreg.nalaq.*; import java.io.*; import java.net.*;"
 )
 
 private fun getScriptEngine(name: String): ScriptEngine {
+    if (KOTLIN_NAMES.contains(name))
+        return KOTLIN_FACTORY.scriptEngine
     return MANAGER.getEngineByName(name) ?: MANAGER.getEngineByExtension(name) ?: MANAGER.getEngineByMimeType(name)
                                          ?: throw RuntimeException("Unknown script engine: $name")
-}
-
-private fun gb(n: Long): String {
-    return "${Math.round(n/1e6)}GB"
 }

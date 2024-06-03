@@ -759,8 +759,8 @@ fun String.toExpression(): Expression {
     return getParser(getContext().configuration.textParser).parse(this)
 }
 
-fun String.translate(srclang: String, dstlang: String): String {
-    return (getParser(TextParser.TRANSLATE) as TranslateParser).translate(srclang, dstlang, this)
+fun String.translate(src: String, dst: String): String {
+    return (getParser(TextParser.TRANSLATE) as TranslateParser).translate(src, dst, this)
 }
 
 fun Number.toBytes(): ByteArray {

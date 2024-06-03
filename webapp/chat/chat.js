@@ -69,13 +69,13 @@ function applyTemplate(templateId, targetId, values) {
 
 async function sendText(inputId, outputId, lineId) {
     const input = document.querySelector("#"+inputId)
-    const chatlog = document.querySelector("#"+outputId)
     const text = input.value
-    const response = await fetch(document.URL, {
+    const response = await fetch("/api/nalaq", {
         method: 'POST',
-        headers: {'Content-Type': 'text/x-nalaq', 'Accept': 'text/plain'},
+        headers: {'Content-Type': 'text/plain', 'Accept': 'text/plain'},
         body: text
     }).then(r => r.text()).catch(e => e.toString())
+    const chatlog = document.querySelector("#"+outputId)
     chatlog.innerHTML += applyTemplate(lineId, null, {prompt: "?", text: text})
                        + applyTemplate(lineId, null, {prompt: "=", text: response})
     input.value = ""

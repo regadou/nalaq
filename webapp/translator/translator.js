@@ -1,5 +1,6 @@
 const languages = {}
 const translation = ["", ""]
+const audioFormats = "mp3,mp4,mpeg,wav,ogg,webm,x-aiff,basic".split(",")
 
 function init() {
     loadLanguages()
@@ -9,7 +10,7 @@ function init() {
 async function loadLanguages() {
     var lang1 = document.querySelector("#lang1select")
     var lang2 = document.querySelector("#lang2select")
-    const langs = await fetch("/languages", {
+    const langs = await fetch("/api/languages", {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
         body: "null"
@@ -41,8 +42,6 @@ async function initDevices() {
                 option.text = sourceInfo.label || 'microphone'
                 audio.add(option)
             }
-            else
-                console.log("Source type "+sourceInfo.kind+" ignored: "+sourceInfo.label)
         }
     })
 }
@@ -77,12 +76,21 @@ async function translateAudio(device, lang) {
 }
 
 function recordAudio(device, lang) {
-    let chunks = []
+    var type = null
+    for (var f in audioFormats) {
+        var format = "audio/"+audioFormats[f]
+        if (MediaRecorder.isTypeSupported(format)) {
+            type = format
+            break
+        }
+    }
+    if (type == null)
+        return alert("Cannot record audio: no format supported in "+audioFormats.join(", "))
     navigator.mediaDevices.getUserMedia({audio:{deviceId:device}}).then(stream => {
-        const mediaRecorder = new MediaRecorder(stream)
+        const mediaRecorder = new MediaRecorder(stream, {mimeType: type})
         mediaRecorder.ondataavailable = (e) => {
-            console.log('pushing '+JSON.stringify(e.data)+' to chunks#'+chunks.length);
-            chunks.push(e.data);
+            console.log('data is '+e.data.size+' bytes of type '+e.data.type);
+            sendAudio(new Blob([e.data], { type: "audio/wav" }), lang)
         }
         mediaRecorder.start()
         var options = {};
@@ -93,19 +101,21 @@ function recordAudio(device, lang) {
         speechEvents.on('stopped_speaking', function() {
             console.log('stopped speaking');
             speechEvents.stop()
+            stream.getTracks().forEach(t => t.stop())
             mediaRecorder.stop()
             setButtonStatus(lang, "speak")
-            sendAudio(new Blob(chunks, { type: "audio/wav" }), lang)
         });
     }).catch(e => console.log("error on stream selection: "+e))
 }
 
-function sendAudio(blob, lang) {
-    const filename = new Date().getTime() + ".wav"
+async function sendAudio(blob, lang) {
+    const type = blob.type.split(";")[0]
+    const filename = new Date().getTime() + "." + type.split("/")[1]
+    console.log("sending "+blob.size+" bytes to "+filename)
     fetch(filename, {
         method: 'PUT',
-        headers: {'Content-Type': 'audio/wav'},
-        body: blob
+        headers: {'Content-Type': type},
+        body: await blob.arrayBuffer()
     }).then(r => r.text()).catch(e => alert(e))
 }
 
@@ -127,7 +137,7 @@ async function translateText(lang) {
 }
 
 async function translationRequest(txt, src, dst) {
-    return (await fetch("/translate?src="+src+"&dst="+dst, {
+    return (await fetch("/api/translate?src="+src+"&dst="+dst, {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Accept': 'text/plain'},
         body: JSON.stringify({text:txt})

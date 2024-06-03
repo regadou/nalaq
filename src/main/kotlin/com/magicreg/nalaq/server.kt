@@ -10,6 +10,8 @@ import io.ktor.server.netty.*
 import io.ktor.server.plugins.*
 import io.ktor.server.sessions.*
 import io.ktor.util.StringValues
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.*
 import java.net.URI
 import java.time.LocalDateTime
@@ -102,7 +104,7 @@ private suspend fun processRequest(topcx: Context, api: Map<String,Any?>, call: 
         else if (status == HttpStatusCode.MovedPermanently)
             call.respondRedirect(data.data.toString(), true)
         else if (data.data is File)
-            call.respondOutputStream(contentType, status) { FileInputStream(data.data).copyTo(this) }
+            call.respondOutputStream(contentType, status) { copyStream(FileInputStream(data.data),this, false) }
         else {
             val bytes = if (data.data is ByteArray) data.data else data.data.toString().toByteArray()
             call.respondBytes(bytes, contentType, status)
@@ -117,8 +119,8 @@ private suspend fun processRequest(topcx: Context, api: Map<String,Any?>, call: 
     webcx.close(false)
 }
 
-private fun httpRequest(cx: Context, api: Map<String,Any?>, request: HttpRequest): ResponseData {
-    logRequest(request.method, request.path, request.remoteHost)
+private suspend fun httpRequest(cx: Context, api: Map<String,Any?>, request: HttpRequest): ResponseData {
+    logRequest(request.method, request.path, request.remoteHost, request.headers["content-length"])
     val service = api[request.path]
     if (service != null)
         return apiRequest(service, request)
@@ -188,7 +190,7 @@ private fun getFileContent(cx: Context, request: HttpRequest, filename: String):
     return ResponseData(StatusCode_NotFound, DEFAULT_MIMETYPE, "$filename not found")
 }
 
-private fun postRequest(cx: Context, request: HttpRequest): ResponseData {
+private suspend fun postRequest(cx: Context, request: HttpRequest): ResponseData {
     val baseuri = cx.configuration.webFolder ?: "."
     val filename = request.path
     val file = File(baseuri+filename)
@@ -202,10 +204,7 @@ private fun postRequest(cx: Context, request: HttpRequest): ResponseData {
             }
             val type = request.headers["content-type"]?.toString()?.split(";")?.get(0)?.trim() ?: DEFAULT_MIMETYPE
             val name = Math.random().toString().split(".")[1] + "." + getMimetypeExtensions(type)[0]
-            FileOutputStream("$file/$name").use { output ->
-                request.inputStream?.copyTo(output)
-                output.close()
-            }
+            FileOutputStream("$file/$name").use { output -> copyStream(request.inputStream!!, output, true) }
             return ResponseData(StatusCode_OK, DEFAULT_MIMETYPE, "$filename/$name")
         }
         return postFileExecute(cx, request, file)
@@ -217,7 +216,7 @@ private fun postFileExecute(cx: Context, request: HttpRequest, file: File): Resp
     return executeScript(cx, request, file) ?: ResponseData(StatusCode_BadRequest, DEFAULT_MIMETYPE, "Cannot add content to $file")
 }
 
-private fun putRequest(cx: Context, request: HttpRequest): ResponseData {
+private suspend fun putRequest(cx: Context, request: HttpRequest): ResponseData {
     if (request.path == "/")
         return ResponseData(StatusCode_MethodNotAllowed, DEFAULT_MIMETYPE, "")
     val baseuri = cx.configuration.webFolder ?: "."
@@ -227,10 +226,7 @@ private fun putRequest(cx: Context, request: HttpRequest): ResponseData {
         if (file.isDirectory)
             return ResponseData(StatusCode_BadRequest, DEFAULT_MIMETYPE, "Cannot add content to $filename")
         // TODO: add script support or overwrite file or block from overwriting file
-        FileOutputStream("$file").use { output ->
-            request.inputStream?.copyTo(output)
-            output.close()
-        }
+        FileOutputStream("$file").use { output -> copyStream(request.inputStream!!, output, true) }
         return ResponseData(StatusCode_OK, DEFAULT_MIMETYPE, "$filename")
     }
     return ResponseData(StatusCode_NotFound, DEFAULT_MIMETYPE, "$filename not found")
@@ -277,8 +273,9 @@ private fun getMap(values: StringValues, normalize: Boolean): Map<String,Any> {
     return map
 }
 
-private fun logRequest(method: UriMethod, uri: String, remote: String) {
-    println(printTime(System.currentTimeMillis())+" "+remote+" "+method+" "+uri)
+private fun logRequest(method: UriMethod, uri: String, remote: String, size: Any?) {
+    val bytes = if (size == null) "" else " received $size bytes"
+    println(printTime(System.currentTimeMillis())+" "+remote+" "+method+" "+uri+bytes)
 }
 
 private fun printTime(millis: Long): String {
@@ -388,4 +385,12 @@ private fun bodyToList(body: Any?): List<Any?> {
         listOf(body)
     else
         emptyList()
+}
+
+private suspend fun copyStream(input: InputStream, output: OutputStream, closeOutput: Boolean) {
+    withContext(Dispatchers.IO) {
+        input.copyTo(output)
+        if (closeOutput)
+            output.close()
+    }
 }
