@@ -12,7 +12,7 @@ if [ -z "$baseurl" ]; then
 fi
 
 echo "checking if required commands are installed ..."
-for cmd in curl pip3 python3 unzip git java; do
+for cmd in curl pip3 python3 unzip git java ffmpeg ffprobe; do
     exist=$(which $cmd)
     if [ -z "$exist" ]; then
         errors=" $cmd"

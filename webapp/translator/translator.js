@@ -1,7 +1,6 @@
 const languages = {}
 const translation = ["", ""]
-const audioFormats = "mp3,mp4,mpeg,wav,ogg,webm,x-aiff,basic".split(",")
-const audioBitRate = 16000
+const saveRecording = false
 
 function init() {
     loadLanguages()
@@ -48,7 +47,13 @@ async function initDevices() {
 }
 
 async function setLanguage(lang) {
-    translation[lang-1] = await setButtonStatus(lang, "speak")
+    const code = document.querySelector("#lang"+lang+"select").value
+    translation[lang-1] = {
+        code: code,
+        speak: (code == "en") ? "speak english" : (await translationRequest("speak "+languages[code].name.toLowerCase(), "en", code)),
+        listen: (code == "en") ? "listening english" : (await translationRequest("listening "+languages[code].name.toLowerCase(), "en", code))
+    }
+    setButtonStatus(lang, "speak")
 }
 
 function listenSpeech(lang) {
@@ -68,7 +73,7 @@ function listenSpeech(lang) {
 }
 
 async function translateAudio(device, lang) {
-    var code = await setButtonStatus(lang, "listening")
+    var code = setButtonStatus(lang, "listen")
     if (!languages[code].model) {
         setButtonStatus(lang, "speak")
         return alert("Language does not support speech to text: "+languages[code].name)
@@ -77,19 +82,9 @@ async function translateAudio(device, lang) {
 }
 
 function recordAudio(device, lang) {
-    var type = null
-    for (var f in audioFormats) {
-        var format = "audio/"+audioFormats[f]
-        if (MediaRecorder.isTypeSupported(format)) {
-            type = format
-            break
-        }
-    }
-    if (type == null)
-        return alert("Cannot record audio: no format supported in "+audioFormats.join(", "))
     navigator.mediaDevices.getUserMedia({audio:{deviceId:device}}).then(stream => {
-        const mediaRecorder = new MediaRecorder(stream, {audioBitsPerSecond: audioBitRate, mimeType: type})
-        mediaRecorder.ondataavailable = (e) => sendAudio(new Blob([e.data], { type: "audio/x-wav; codecs=0" }), lang)
+        const mediaRecorder = new MediaRecorder(stream)
+        mediaRecorder.ondataavailable = (e) => sendAudio(e.data, lang)
         mediaRecorder.start()
         var options = {};
         var speechEvents = hark(stream, options);
@@ -107,6 +102,8 @@ function recordAudio(device, lang) {
 }
 
 async function sendAudio(blob, lang) {
+    if (saveRecording)
+        return saveAudioFile(blob)
     const type = blob.type.split(";")[0]
     const code = document.querySelector("#lang"+lang+"select").value
     var txt = await fetch("/api/speech?lang="+code, {
@@ -156,11 +153,21 @@ function speakRequest(lang) {
     .then(r => httpResponse(r, "blob")).then(b => playAudio(b)).catch(e => alert(e))
 }
 
-async function setButtonStatus(lang, status) {
-    var code = document.querySelector("#lang"+lang+"select").value
-    var txt = (code == "en") ? status+" english" : (await translationRequest(status+" "+languages[code].name.toLowerCase(), "en", code))
-    document.querySelector("#lang"+lang+"button").value = txt
-    return code
+async function saveAudioFile(blob) {
+    const type = blob.type.split(";")[0]
+    const extension = type.split("/")[1].replace("x-","")
+    const filename = new Date().getTime()+"."+extension
+    fetch("/audio/"+filename, {
+        method: 'PUT',
+        headers: {'Content-Type': type, 'accept': "text/plain"},
+        body: await blob.arrayBuffer()
+    }).then(r => httpResponse(r, "text")).then(t => alert(t)).catch(e => alert(e))
+    playAudio(blob)
+}
+
+function setButtonStatus(lang, status) {
+    document.querySelector("#lang"+lang+"button").value = translation[lang-1][status]
+    return translation[lang-1].code
 }
 
 function playAudio(blob) {

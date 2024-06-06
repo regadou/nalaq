@@ -82,14 +82,8 @@ class SpeechWriter(language: String, voiceCommandTemplate: String, val audioStre
     private val voiceCommand = createVoiceCommand(language, voiceCommandTemplate)
     private val bufferSize = 1024
     private val buffer = ByteArray(bufferSize)
-    private var process: Process? = null
 
-    override fun close() {
-        if (process != null) {
-            process!!.destroy()
-            process = null
-        }
-    }
+    override fun close() {}
 
     override fun flush() {}
 
@@ -115,26 +109,16 @@ class SpeechWriter(language: String, voiceCommandTemplate: String, val audioStre
 
     fun audioInputStream(text: String): AudioInputStream {
         close()
-        process = startProcess()
-        process!!.outputStream.write(text.toByteArray(Charset.forName(defaultCharset())))
-        process!!.outputStream.flush()
-        process!!.outputStream.close()
-        return AudioSystem.getAudioInputStream(process!!.inputStream)
+        return AudioSystem.getAudioInputStream(runCommand(voiceCommand, text.toByteArray(Charset.forName(defaultCharset()))))
     }
 
-    private fun startProcess(): Process {
-        return ProcessBuilder(*voiceCommand)
-            .redirectError(ProcessBuilder.Redirect.INHERIT)
-            .start()
-    }
-
-    private fun createVoiceCommand(language: String, voiceCommandTemplate: String): Array<String> {
+    private fun createVoiceCommand(language: String, voiceCommandTemplate: String): List<String> {
         val langObject = getLanguage(language)
         if (langObject == null || langObject.voice.isNullOrBlank())
             throw RuntimeException("Invalid speech language: $language")
         val index = voiceCommandTemplate.indexOf(voiceTemplateVariable)
         val command = if (index < 0) "$voiceCommandTemplate ${langObject.voice}" else voiceCommandTemplate.replace(voiceTemplateVariable, langObject.voice)
-        return command.split(" ").toTypedArray()
+        return command.split(" ")
     }
 }
 
@@ -166,7 +150,7 @@ class VoskSpeechProcessor(private val reader: SpeechReader): SpeechProcessor {
             return
         voskSpeechModel(reader).use { model ->
             reader.audioStream.use { input ->
-                Recognizer(model, sampleRate).use { recognizer ->
+                Recognizer(model, defaultSampleRate).use { recognizer ->
                     var lastIsPartial = false
                     var count: Int = 0
                     val bytes = ByteArray(4096)
@@ -197,9 +181,8 @@ class VoskSpeechProcessor(private val reader: SpeechReader): SpeechProcessor {
 }
 
 class AudioType(val type: AudioFileFormat.Type): Format {
-    private val labels: List<String> = audioFormatsMap[type.extension] ?: throw RuntimeException("Unknown audio extension ${type.extension} from $type")
-    override val mimetype: String = labels[0]
-    override val extensions: List<String> = labels.subList(1, labels.size)
+    override val mimetype: String = getExtensionMimetype(type.extension) ?: throw RuntimeException("Unknown audio extension ${type.extension} from $type")
+    override val extensions: List<String> = getMimetypeExtensions(mimetype)
     override val scripting: Boolean = false
     override val supported: Boolean = true
 
@@ -220,7 +203,7 @@ class AudioType(val type: AudioFileFormat.Type): Format {
 }
 
 class AudioStream {
-    private var format: AudioFormat = AudioFormat(0f, 0, 0, true, true)
+    private var format: AudioFormat = defaultAudioFormat
     private var bytes: ByteArray = byteArrayOf()
     private var frameLength: Long = 0
     val audioFormat: AudioFormat get() = format
@@ -250,20 +233,13 @@ class AudioStream {
     }
 }
 
-private const val sampleRate = 16000F
+private const val defaultSampleRate = 16000F
+private const val defaultSampleSize = 16
 private const val sendPartial = false
 private const val voiceTemplateVariable = "{voice}"
-private val defaultAudioFormat = AudioFormat(sampleRate, 16, 1, true, false)
+private val defaultAudioFormat = AudioFormat(defaultSampleRate, defaultSampleSize, 1, true, false)
 private val speechInputMap = mutableMapOf<String,SpeechReader>()
 private var voskModelMap = mutableMapOf<String,Model>()
-private val audioFormats = arrayOf<List<String>>(
-    "audio/x-aiff,aif,aiff,aifc".split(","),
-    "audio/basic,au,snd".split(","),
-    "audio/x-wav,wav".split(","),
-    "audio/mpeg,mp3,mpga,mpega,mp1,mp2".split(","),
-    "audio/ogg,oga,ogg,opus,spx".split(",")
-)
-private val audioFormatsMap = initAudioFormats()
 
 private fun speechProcessor(reader: SpeechReader): SpeechProcessor {
     return VoskSpeechProcessor(reader)
@@ -294,13 +270,4 @@ private fun voskSpeechModel(reader: SpeechReader): Model {
     val model = Model("$file/${lang.model}")
     voskModelMap[reader.language] = model
     return model
-}
-
-private fun initAudioFormats(): Map<String,List<String>> {
-    val map = mutableMapOf<String,List<String>>()
-    for (format in audioFormats) {
-        for (label in format)
-            map[label] = format
-    }
-    return map
 }

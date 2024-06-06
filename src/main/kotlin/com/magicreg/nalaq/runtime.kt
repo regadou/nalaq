@@ -3,10 +3,13 @@ package com.magicreg.nalaq
 import org.apache.commons.beanutils.BeanMap
 import java.io.BufferedReader
 import java.io.File
+import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.URI
 import java.nio.charset.Charset
 import java.util.*
+import javax.sound.sampled.AudioInputStream
+import javax.sound.sampled.AudioSystem
 import kotlin.reflect.KFunction
 
 fun runConfiguration(config: Configuration) {
@@ -49,24 +52,26 @@ fun loadConfiguration(args: Array<String>): Configuration? {
 
     val configData = toMap(value)
     val arguments = mutableListOf<String>()
-    var start: String? = null
-    var exp: String? = null
+    var start: String? = configData["startMethod"]?.toString()
     var parser: TextParser? = null
-    if (args.size > offset) {
+    val exp = if (args.size > offset) {
         start = "expression"
         val subArgs = args.toList().subList(offset, args.size)
         val pair = loadScriptFile(subArgs)
         parser = pair.first
         val script = pair.second
-        exp = script ?: subArgs.joinToString(" ")
         if (script != null)
             arguments.addAll(subArgs.subList(1, subArgs.size))
+        script ?: subArgs.joinToString(" ")
     }
+    else
+        configData["executeExpression"]?.toString()
+    val lineCount = exp?.split("\n")?.filter(::notEmptyNorComment)?.size ?: 0
 
     return Configuration(
-        consolePrompt = if (configData.containsKey("consolePrompt")) configData["consolePrompt"]?.toString() else defaultConsolePrompt,
-        resultPrompt = if (configData.containsKey("resultPrompt")) configData["resultPrompt"]?.toString() else defaultResultPrompt,
-        expressionPrompt = if (configData.containsKey("expressionPrompt")) configData["expressionPrompt"]?.toString() else defaultExpressionPrompt,
+        consolePrompt = if (configData.containsKey("consolePrompt")) configData["consolePrompt"]?.toString() else if (lineCount == 0) defaultConsolePrompt else null,
+        resultPrompt = if (configData.containsKey("resultPrompt")) configData["resultPrompt"]?.toString() else if (lineCount == 0) defaultResultPrompt else null,
+        expressionPrompt = if (configData.containsKey("expressionPrompt")) configData["expressionPrompt"]?.toString() else null,
         printConfig = toBoolean(configData["printConfig"]),
         remoteScripting = toBoolean(configData["remoteScripting"]),
         outputFormat = configData["outputFormat"]?.toString(),
@@ -81,8 +86,8 @@ fun loadConfiguration(args: Array<String>): Configuration? {
         namespaces = getMapUris(configData["namespaces"], ::loadNamespace),
         webFolder = configData["webFolder"]?.toString() ?: defaultWebFolder,
         webApi = configData["webApi"]?.toUri(),
-        startMethod =  configData["startMethod"]?.toString() ?: start,
-        executeExpression = exp ?: configData["executeExpression"]?.toString(),
+        startMethod =  start,
+        executeExpression = exp,
         arguments = arguments
     )
 }
@@ -133,6 +138,19 @@ fun getLanguage(code: String): Language? {
 
 fun getSpeechWriter(): SpeechWriter? {
     return speaker
+}
+
+fun runCommand(command: List<String>, input: ByteArray? = null, errorRedirect: ProcessBuilder.Redirect? = ProcessBuilder.Redirect.DISCARD): InputStream {
+    val process = if (errorRedirect == null)
+        ProcessBuilder(command).redirectErrorStream(true).start()
+    else
+        ProcessBuilder(command).redirectError(errorRedirect).start()
+    if (input != null) {
+        process.outputStream.write(input)
+        process.outputStream.flush()
+    }
+    process.outputStream.close()
+    return process.inputStream
 }
 
 private val configWords = "conf,config,configuration".split(",")

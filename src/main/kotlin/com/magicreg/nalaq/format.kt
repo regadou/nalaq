@@ -23,7 +23,6 @@ import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.imageio.ImageIO
-import javax.sound.sampled.AudioSystem
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
@@ -31,6 +30,10 @@ import javax.xml.transform.stream.StreamResult
 import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
+
+fun getSupportedFormats(): List<Format> {
+    return MIMETYPES.values.filter{it.supported}.toSortedSet(::compareFormats).toList()
+}
 
 fun getFormat(txt: String): Format? {
     val lower = txt.lowercase()
@@ -57,6 +60,29 @@ fun detectFileType(path: String?): String? {
         return "text/plain"
     parts = filename.split(".")
     return getExtensionMimetype(parts[parts.size-1])
+}
+
+fun loadAllMimetypes(): Map<String,List<String>> {
+    val map = mutableMapOf<String,MutableList<String>>()
+    val reader = BufferedReader(InputStreamReader(GenericFormat::class.java.getResource("/mime.types").openStream()))
+    reader.lines().forEach { line ->
+        val escape = line.indexOf('#')
+        val txt = if (escape >= 0) line.substring(0, escape) else line
+        var mimetype: String? = null
+        val extensions = mutableListOf<String>()
+        val e = StringTokenizer(txt.lowercase())
+        while (e.hasMoreElements()) {
+            val token = e.nextElement().toString()
+            if (mimetype == null)
+                mimetype = token
+            else
+                extensions.add(token)
+        }
+        if (mimetype != null)
+            map[mimetype] = extensions
+    }
+    reader.close()
+    return map
 }
 
 class GenericFormat(
@@ -119,31 +145,17 @@ private fun configureJsonMapper(mapper: ObjectMapper): ObjectMapper {
 
 private fun loadMimeTypesFile(): MutableMap<String,Format> {
     val mimetypes = initManagedMimetypes()
-    val reader = BufferedReader(InputStreamReader(GenericFormat::class.java.getResource("/mime.types").openStream()))
-    reader.lines().forEach { line ->
-        val escape = line.indexOf('#')
-        val txt = if (escape >= 0) line.substring(0, escape) else line
-        var mimetype: String? = null
-        var extensions = mutableListOf<String>()
-        val e = StringTokenizer(txt)
-        while (e.hasMoreElements()) {
-            val token = e.nextElement().toString()
-            if (mimetype == null)
-                mimetype = token
-            else
-                extensions.add(token)
-        }
-        if (mimetype != null) {
-            val scripting = SCRIPTING_FORMATS[mimetype] ?: false
-            if (mimetypes[mimetype] != null)
-                ;
-            else if (mimetype.split("/")[0] == "text")
-                addMimetype(mimetypes, ::decodeString, ::encodeString, mimetype, extensions, scripting, false)
-            else
-                addMimetype(mimetypes, ::decodeBytes, ::encodeBytes, mimetype, extensions, scripting, false)
-        }
+    for (entry in loadAllMimetypes().entries) {
+        val mimetype = entry.key
+        val extensions = entry.value
+        val scripting = SCRIPTING_FORMATS[mimetype] ?: false
+        if (mimetypes[mimetype] != null)
+            ;
+        else if (mimetype.split("/")[0] == "text")
+            addMimetype(mimetypes, ::decodeString, ::encodeString, mimetype, extensions, scripting, false)
+        else
+            addMimetype(mimetypes, ::decodeBytes, ::encodeBytes, mimetype, extensions, scripting, false)
     }
-    reader.close()
     return mimetypes
 }
 
@@ -193,10 +205,12 @@ private fun initManagedMimetypes(): MutableMap<String,Format> {
         }
     }
 
-    for (type in AudioSystem.getAudioFileTypes()) {
-        val format = AudioType(type)
-        formats[format.mimetype] = format
-        addExtensions(format)
+    for (format in getMediaFormats()) {
+        val type = format.mimetype
+        if (!formats.containsKey(type)) {
+            formats[type] = format
+            addExtensions(format)
+        }
     }
 
     for (format in initRdfFormats(formats.keys)) {
@@ -555,6 +569,10 @@ private fun detectSeparator(input: InputStream): Char {
             break
     }
     return CSV_SEPARATORS[0]
+}
+
+private fun compareFormats(f1: Format, f2: Format): Int {
+    return f1.mimetype.compareTo(f2.mimetype)
 }
 
 private fun unsupportedScriptingFormats(): Map<String,Boolean> {

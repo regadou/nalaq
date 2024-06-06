@@ -1971,7 +1971,7 @@ model/u3d                    u3d
 model/vnd.collada+xml                dae
 model/vnd.dwf                    dwf
 model/vnd.flatland.3dml
-model/vnd.gdl                    gdl gsm win dor lmp rsm msm ism
+model/vnd.gdl                    gdl win dor lmp rsm msm ism
 model/vnd.gs-gdl
 model/vnd.gtw                    gtw
 model/vnd.moml+xml                moml
@@ -2228,7 +2228,7 @@ video/x-ms-wvx                    wvx
 video/x-msvideo                    avi
 video/x-sgi-movie                movie
 
-# added for nalaq server-side scripting ofuscation
+# added for hiding server-side scripting files
 text/x-cgi         cgi
 text/x-php         php
 text/x-asp         asp
