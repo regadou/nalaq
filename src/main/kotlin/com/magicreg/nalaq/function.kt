@@ -279,7 +279,7 @@ fun while_func(args: List<Any?>): Any? {
 }
 
 fun each_func(args: List<Any?>): Any? {
-    val (iterator, key, expression) = findTokenTypes(args)
+    val (iterator, key, expression) = findDataTypes(args)
     if (expression == null || iterator == null || key == null) {
         val missing = mutableListOf<String>()
         if (expression == null)
@@ -403,7 +403,7 @@ private val FUNCTIONS_PRECEDENCE = listOf<List<KFunction<Any?>>>(
     listOf(::not_func)
 )
 private val FUNCTION_PRECEDENCE_MAP = mapPrecedences()
-private enum class TokenType { ITERABLE, REFERENCE, EXPRESSION, MAP, TEXT}
+private enum class DataType { ITERABLE, REFERENCE, EXPRESSION, MAP, TEXT}
 
 private fun mapPrecedences(): Map<KFunction<Any?>, Int> {
     val map = mutableMapOf<KFunction<Any?>, Int>()
@@ -446,32 +446,32 @@ private fun resolveProperty(value: Any?): Any? {
     return null
 }
 
-private fun findTokenTypes(args: List<Any?>): Triple<Iterator<*>?,String?,Expression?> {
+private fun findDataTypes(args: List<Any?>): Triple<Iterator<*>?,String?,Expression?> {
     if (args.size != 3)
         throw RuntimeException("Function each needs 3 arguments but got ${args.size}: $args")
-    val types = arrayOf(mutableListOf(), mutableListOf<TokenType>(), mutableListOf<TokenType>())
+    val types = arrayOf(mutableListOf(), mutableListOf<DataType>(), mutableListOf())
     for ((index, token) in args.withIndex()) {
         if (token.isIterable())
-            types[index].add(TokenType.ITERABLE)
+            types[index].add(DataType.ITERABLE)
         if (token is Expression)
-            types[index].add(TokenType.EXPRESSION)
+            types[index].add(DataType.EXPRESSION)
         if (token.isReference())
-            types[index].add(TokenType.REFERENCE)
+            types[index].add(DataType.REFERENCE)
         if (token.isText())
-            types[index].add(TokenType.TEXT)
+            types[index].add(DataType.TEXT)
         if (token.isMappable())
-            types[index].add(TokenType.MAP)
+            types[index].add(DataType.MAP)
     }
 
-    val collectionCount = types.filter{it.contains(TokenType.ITERABLE)}.size
-    val keyCount = types.filter{it.contains(TokenType.REFERENCE)||it.contains(TokenType.TEXT)}.size
-    var expressionCount = types.filter{it.contains(TokenType.EXPRESSION)}.size
-    var mapCount = types.filter{it.contains(TokenType.MAP)}.size
+    val collectionCount = types.filter{it.contains(DataType.ITERABLE)}.size
+    val keyCount = types.filter{it.contains(DataType.REFERENCE)||it.contains(DataType.TEXT)}.size
+    var expressionCount = types.filter{it.contains(DataType.EXPRESSION)}.size
+    var mapCount = types.filter{it.contains(DataType.MAP)}.size
 
     val collection: Iterator<Any?>? = if (collectionCount > 0)
-        pickFirst(args, types, TokenType.ITERABLE).toIterator()
+        pickFirst(args, types, DataType.ITERABLE).toIterator()
     else if (expressionCount > 1) {
-        val iterator = pickFirst(args, types, TokenType.EXPRESSION).resolve()?.toIterator()
+        val iterator = pickFirst(args, types, DataType.EXPRESSION).resolve()?.toIterator()
         if (iterator != null) {
             expressionCount--
             iterator
@@ -483,9 +483,9 @@ private fun findTokenTypes(args: List<Any?>): Triple<Iterator<*>?,String?,Expres
         findIterator(args, types, keyCount)
 
     val key: String? = if (keyCount > 0) {
-        val txt = pickFirst(args, types, TokenType.TEXT)?.toText()
+        val txt = pickFirst(args, types, DataType.TEXT)?.toText()
         if (txt == null) {
-            val ref = pickFirst(args, types, TokenType.REFERENCE)?.toReference()
+            val ref = pickFirst(args, types, DataType.REFERENCE)?.toReference()
             ref?.resolve()?.toText() ?: ref?.key
         }
         else
@@ -493,7 +493,7 @@ private fun findTokenTypes(args: List<Any?>): Triple<Iterator<*>?,String?,Expres
     }
     else if (expressionCount > 1) {
         expressionCount--
-        val value = pickFirst(args, types, TokenType.EXPRESSION).resolve()
+        val value = pickFirst(args, types, DataType.EXPRESSION).resolve()
         if (value.isReference()) {
             val ref = value.toReference()
             ref?.resolve()?.toText() ?: ref?.key
@@ -502,7 +502,7 @@ private fun findTokenTypes(args: List<Any?>): Triple<Iterator<*>?,String?,Expres
             value.toText()
     }
     else if (mapCount > 0) {
-        val map = pickFirst(args, types, TokenType.MAP).toMap()
+        val map = pickFirst(args, types, DataType.MAP).toMap()
         if (map != null && map.size == 1) {
             mapCount--
             val entry = map.entries.iterator().next()
@@ -515,16 +515,16 @@ private fun findTokenTypes(args: List<Any?>): Triple<Iterator<*>?,String?,Expres
         null
 
     val expression: Expression? = if (expressionCount > 0)
-        toExpression(pickFirst(args, types, TokenType.EXPRESSION))
+        toExpression(pickFirst(args, types, DataType.EXPRESSION))
     else if (mapCount > 0)
-        toExpression(pickFirst(args, types, TokenType.MAP).toMap())
+        toExpression(pickFirst(args, types, DataType.MAP).toMap())
     else
         null
 
     return Triple(collection, key, expression)
 }
 
-private fun pickFirst(args: List<Any?>, types: Array<MutableList<TokenType>>, type: TokenType): Any? {
+private fun pickFirst(args: List<Any?>, types: Array<MutableList<DataType>>, type: DataType): Any? {
     val index = types.indexOfFirst{it.contains(type)}
     if (index < 0)
         return null
@@ -532,16 +532,16 @@ private fun pickFirst(args: List<Any?>, types: Array<MutableList<TokenType>>, ty
     return args[index]
 }
 
-private fun findIterator(args: List<Any?>, types: Array<MutableList<TokenType>>, keyCount: Int): Iterator<Any?>? {
+private fun findIterator(args: List<Any?>, types: Array<MutableList<DataType>>, keyCount: Int): Iterator<Any?>? {
     if (keyCount > 1) {
-        val ref = pickFirst(args, types, TokenType.REFERENCE)
+        val ref = pickFirst(args, types, DataType.REFERENCE)
         if (ref.isReference()) {
             val value = ref.toReference().resolve()
             if (value.isIterable())
                 return value.toIterator()
         }
     }
-    val map = pickFirst(args, types, TokenType.MAP)
+    val map = pickFirst(args, types, DataType.MAP)
     if (map.isMappable())
         return map.toMap()?.entries?.iterator()
     return null

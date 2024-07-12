@@ -1,0 +1,33 @@
+nalaq api:
+- api.kt
+- context.kt
+- filter.kt
+- format.kt
+- function.kt
+- namespace.kt
+- reference.kt
+- type.kt
+- uri.kt
+
+systems interfaces:
+- adapters.kt
+- converters.kt
+- main.kt
+- runtime.kt
+- server.kt
+
+parsers:
+- snlp.kt
+- anlp.kt
+- parser.kt
+- rest.kt
+- scripting.kt
+
+format implementations:
+- audio.kt
+- database.kt
+- person.kt
+- rdf.kt
+- video.kt
+- view.kt
+

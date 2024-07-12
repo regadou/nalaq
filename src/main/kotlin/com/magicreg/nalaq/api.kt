@@ -1,6 +1,7 @@
 package com.magicreg.nalaq
 
 import ezvcard.VCard
+import jakarta.json.JsonValue
 import org.apache.commons.beanutils.BeanMap
 import org.jsoup.nodes.Element
 import java.io.*
@@ -38,7 +39,7 @@ enum class CompareOperator(val symbol: String, val function: KFunction<Any?>) {
 enum class LogicOperator { OR, AND }
 enum class UriMethod { GET, POST, PUT, DELETE }
 enum class DataLevel { NOTHING, NUMBER, FUNCTION, ENTITY, COLLECTION, TEXT, VIEW, ALL }
-enum class TextParser { NALAQ, NLP, TRANSLATE, KOTLIN, JSON, YAML }
+enum class TextParser { NALAQ, SNLP, ANLP, TRANSLATE, KOTLIN, REST, JSON, YAML }
 
 data class Configuration(
     val consolePrompt: String? = null,
@@ -213,6 +214,8 @@ fun <T: Any> convert(value: Any?, type: KClass<T>): T {
         return value as T
     if (value.isReference())
         return convert(value.resolve(), type)
+    if (value is JsonValue)
+        return convert(value.unwrap(), type)
     val converter = getConverter(type)
     if (converter != null)
         return converter.call(value) as T
@@ -244,6 +247,8 @@ fun Any?.type(): Type {
             }
         }
     }
+    if (this is JsonValue)
+        return this.unwrap().type()
     if (this is URI)
         this.resolve().type()
     if (this is CharSequence) {
@@ -264,24 +269,26 @@ fun Any?.dataLevel(): DataLevel {
 
 fun Any?.resolve(deepResolving: Boolean = false): Any? {
     if (this is Expression)
-        return this.value().resolve()
+        return this.value().resolve(deepResolving)
     if (this is Map.Entry<*,*>)
-        return this.value.resolve()
+        return this.value.resolve(deepResolving)
     if (this is URI)
-        return this.get().resolve()
+        return this.get().resolve(deepResolving)
     if (this is URL)
-        return this.toURI().get().resolve()
+        return this.toURI().get().resolve(deepResolving)
     if (this is File)
-        return this.toURI().get().resolve()
+        return this.toURI().get().resolve(deepResolving)
+    if (this is JsonValue)
+        return this.unwrap().resolve(deepResolving)
     if (deepResolving) {
         if (this.isText()) {
             val txt = this.toText()
             val uri = txt.toUri()
             if (uri != null)
-                return uri.get().resolve()
+                return uri.get().resolve(deepResolving)
             val cx = getContext()
             if (cx.hasName(txt))
-                return cx.value(txt).resolve()
+                return cx.value(txt).resolve(deepResolving)
             return txt
         }
         if (this is Collection<*>)

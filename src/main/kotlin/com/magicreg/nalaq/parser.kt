@@ -10,10 +10,12 @@ fun getParser(textParser: TextParser): Parser {
     if (parser != null)
         return parser
     PARSERS_MAP[textParser] = when (textParser) {
-        TextParser.NALAQ -> GenericParser()
-        TextParser.NLP -> NlpParser(getContext().configuration.nlpModelsFolder ?: throw RuntimeException("NLP model folder was not specified"))
+        TextParser.NALAQ -> NalaqParser()
+        TextParser.SNLP -> SnlpParser()
+        TextParser.ANLP -> AnlpParser(getContext().configuration.nlpModelsFolder ?: throw RuntimeException("NLP model folder was not specified"))
         TextParser.TRANSLATE -> TranslateParser()
         TextParser.KOTLIN -> ScriptEngineParser("kts")
+        TextParser.REST -> RestParser()
         TextParser.JSON -> LogicParser(JsonLogic(), getFormat("application/json")!!)
         TextParser.YAML -> LogicParser(JsonLogic(), getFormat("application/yaml")!!)
     }
@@ -66,7 +68,7 @@ class LogicParser(private val logic: JsonLogic, private val format: Format): Par
     }
 }
 
-class GenericParser: Parser {
+class NalaqParser: Parser {
     override fun parse(txt: String): Expression {
         val tokens = parseText(txt)
         if (tokens.isEmpty())
@@ -78,7 +80,7 @@ class GenericParser: Parser {
     }
 
     override fun toString(): String {
-        return "GenericParser"
+        return "NalaqParser"
     }
 }
 

@@ -15,7 +15,7 @@ import java.io.InputStream
 import java.util.*
 import kotlin.reflect.KFunction
 
-class NlpParser(
+class AnlpParser(
     private val modelFolder: String,
     private val dictionary: Map<*, *> = TreeMap<Any?, Any?>(),
     lazyLoading: Boolean = false,
@@ -32,7 +32,7 @@ class NlpParser(
     }
 
     override fun toString(): String {
-        return "NlpParser"
+        return "AnlpParser"
     }
 
     override fun parse(txt: String): Expression {
@@ -93,7 +93,13 @@ class NlpParser(
     }
 }
 
-class Sentence(
+private const val DEFAULT_SENTENCE_MODEL = "en-sent.bin"
+private const val DEFAULT_TOKENIZER_MODEL = "en-token.bin"
+private const val DEFAULT_PARSER_MODEL = "en-parser-chunking.bin"
+private const val DEFAULT_LANGUAGE = "en"
+private val POS_INSTANCES = initPOS()
+
+private class Sentence(
     val text: String,
     private val tokenizer: Tokenizer,
     private val parser: Parser,
@@ -185,7 +191,7 @@ class Sentence(
     }
 }
 
-class Word(
+private class Word(
     override val key: String,
     val wordType: WordType,
     override val value: Any?,
@@ -211,7 +217,7 @@ class Word(
     }
 }
 
-enum class WordType(val datatype: Type) {
+private enum class WordType(val datatype: Type) {
     DETERMINER(getTypeByName("entity")!!),
     ADJECTIVE(getTypeByName("property")!!),
     ADVERB(getTypeByName("property")!!),
@@ -227,7 +233,7 @@ enum class WordType(val datatype: Type) {
     WORD(getTypeByName("text")!!)
 }
 
-class PartOfSpeech(
+private class PartOfSpeech(
     val code: String,
     val name: String,
     val description: String,
@@ -236,13 +242,15 @@ class PartOfSpeech(
     override fun toString(): String {
         return "PartOfSpeech($name)"
     }
+    companion object {
+        val entries: List<PartOfSpeech> get() {
+            return POS_INSTANCES.values.toList()
+        }
+        fun values(): Array<PartOfSpeech> {
+            return POS_INSTANCES.values.toTypedArray()
+        }
+    }
 }
-
-private const val DEFAULT_SENTENCE_MODEL = "en-sent.bin"
-private const val DEFAULT_TOKENIZER_MODEL = "en-token.bin"
-private const val DEFAULT_PARSER_MODEL = "en-parser-chunking.bin"
-private const val DEFAULT_LANGUAGE = "en"
-private val POS_INSTANCES = initPOS()
 
 private fun getWordType(txt: String): WordType? {
     try { return WordType.valueOf(txt.uppercase()) }
